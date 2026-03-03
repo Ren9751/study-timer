@@ -176,6 +176,7 @@ StudyTimer.prototype.bindEvents = function() {
   });
 
   document.getElementById('btn-clear-demo').addEventListener('click', function() {
+    if (!confirm('デモデータを消去しますか？')) return;
     var keys = [];
     for (var i = 0; i < localStorage.length; i++) {
       var key = localStorage.key(i);
@@ -194,6 +195,7 @@ StudyTimer.prototype.bindEvents = function() {
   });
 
   document.getElementById('btn-insert-demo').addEventListener('click', function() {
+    if (!confirm('デモデータを入れますか？現在のデータは上書きされます。')) return;
     Store.remove('demoDataInserted');
     location.reload();
   });
