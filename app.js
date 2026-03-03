@@ -135,6 +135,11 @@ StudyTimer.prototype.bindEvents = function() {
     self.saveAndReset();
   });
 
+  document.getElementById('btn-reset').addEventListener('click', function() {
+    if (!confirm('タイマーをリセットしますか？記録は保存されません。')) return;
+    self.resetTimer();
+  });
+
   document.getElementById('subject-select').addEventListener('change', function() {
     self.currentSubject = this.value;
     var btn = document.getElementById('btn-start');
@@ -341,6 +346,17 @@ StudyTimer.prototype.saveAndReset = function() {
   this.renderToday();
 };
 
+StudyTimer.prototype.resetTimer = function() {
+  clearInterval(this.timerInterval);
+  this.timerInterval = null;
+  this.timerRunning = false;
+  this.timerPaused = false;
+  this.timerStart = null;
+  this.timerAccumulated = 0;
+  this.clearTimerState();
+  this.updateTimerUI();
+};
+
 StudyTimer.prototype.updateTimerDisplay = function() {
   var elapsed = this.timerAccumulated + Math.floor((Date.now() - this.timerStart) / 1000);
   document.getElementById('timer-time').textContent = formatTime(elapsed);
@@ -349,6 +365,7 @@ StudyTimer.prototype.updateTimerDisplay = function() {
 StudyTimer.prototype.updateTimerUI = function() {
   var btn = document.getElementById('btn-start');
   var btnSave = document.getElementById('btn-save');
+  var btnReset = document.getElementById('btn-reset');
   var display = document.getElementById('timer-time');
   var subjectLabel = document.getElementById('timer-subject-label');
   var select = document.getElementById('subject-select');
@@ -357,22 +374,24 @@ StudyTimer.prototype.updateTimerUI = function() {
   btn.classList.remove('btn-primary', 'btn-pause', 'btn-stop');
 
   if (this.timerRunning) {
-    // 計測中 → 一時停止ボタン + 保存ボタン
+    // 計測中 → 一時停止ボタン + 保存・リセットボタン
     btn.textContent = '一時停止';
     btn.classList.add('btn-pause');
     btn.disabled = false;
     btnSave.classList.remove('hidden');
+    btnReset.classList.remove('hidden');
     display.classList.add('running');
     subjectLabel.textContent = this.currentSubject;
     select.disabled = true;
   } else if (this.timerPaused) {
-    // 一時停止中 → 再開ボタン + 保存ボタン
+    // 一時停止中 → 再開ボタン + 保存・リセットボタン
     btn.textContent = '再開';
     btn.classList.add('btn-stop');
     btn.disabled = false;
     btnSave.classList.remove('hidden');
+    btnReset.classList.remove('hidden');
     display.textContent = formatTime(this.timerAccumulated);
-    display.classList.add('running'); // 一時停止中も色を残す
+    display.classList.add('running');
     subjectLabel.textContent = this.currentSubject;
     select.disabled = true;
   } else {
@@ -381,6 +400,7 @@ StudyTimer.prototype.updateTimerUI = function() {
     btn.classList.add('btn-primary');
     btn.disabled = !this.currentSubject;
     btnSave.classList.add('hidden');
+    btnReset.classList.add('hidden');
     display.textContent = '00:00:00';
     display.classList.remove('running');
     subjectLabel.textContent = '';
