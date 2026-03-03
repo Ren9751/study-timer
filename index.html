@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#000000">
+  <title>Study Timer</title>
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="container">
+    <nav class="tabs">
+      <button class="tab active" data-tab="timer">タイマー</button>
+      <button class="tab" data-tab="log">ログ</button>
+      <button class="tab" data-tab="stats">統計</button>
+    </nav>
+
+    <!-- タイマータブ -->
+    <div id="tab-timer" class="tab-content active">
+      <div class="timer-display">
+        <div class="timer-time" id="timer-time">00:00:00</div>
+        <div class="timer-subject" id="timer-subject-label"></div>
+      </div>
+
+      <div class="subject-select">
+        <select id="subject-select">
+          <option value="">科目を選択</option>
+        </select>
+        <button class="btn-icon" id="btn-add-subject" aria-label="科目追加">＋</button>
+      </div>
+
+      <div class="timer-controls">
+        <button class="btn btn-primary btn-large" id="btn-start" disabled>開始</button>
+        <button class="btn btn-save btn-large hidden" id="btn-save">保存</button>
+      </div>
+
+      <div class="today-summary">
+        <h2>今日の記録</h2>
+        <div class="today-total" id="today-total">0:00:00</div>
+        <div class="today-entries" id="today-entries"></div>
+      </div>
+    </div>
+
+    <!-- ログタブ -->
+    <div id="tab-log" class="tab-content">
+      <div class="calendar" id="calendar">
+        <div class="calendar-header">
+          <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
+          <span id="cal-month"></span>
+          <button class="btn-icon" id="cal-next" aria-label="次月">›</button>
+        </div>
+        <div class="calendar-weekdays">
+          <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
+        </div>
+        <div class="calendar-days" id="cal-days"></div>
+      </div>
+
+      <div class="day-detail" id="day-detail">
+        <h2 id="day-detail-date"></h2>
+        <div class="day-total" id="day-detail-total"></div>
+        <div class="day-entries" id="day-detail-entries"></div>
+      </div>
+    </div>
+
+    <!-- 統計タブ -->
+    <div id="tab-stats" class="tab-content">
+      <div class="stats-period">
+        <button class="btn-period active" data-period="day">日</button>
+        <button class="btn-period" data-period="week">週</button>
+        <button class="btn-period" data-period="month">月</button>
+        <button class="btn-period" data-period="year">年</button>
+      </div>
+
+      <div class="stats-nav">
+        <button class="btn-icon" id="stats-prev" aria-label="前の期間">‹</button>
+        <span class="stats-nav-label" id="stats-nav-label"></span>
+        <button class="btn-icon" id="stats-next" aria-label="次の期間">›</button>
+      </div>
+
+      <div class="stats-total-card">
+        <div class="stats-total-label">合計勉強時間</div>
+        <div class="stats-total-time" id="stats-total-time">0:00:00</div>
+      </div>
+
+      <div class="stats-chart-section">
+        <canvas id="stats-bar-chart"></canvas>
+      </div>
+
+      <div class="stats-donut-section">
+        <canvas id="stats-donut-chart" width="200" height="200"></canvas>
+        <div class="stats-donut-legend" id="stats-donut-legend"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 科目追加モーダル -->
+  <div class="modal" id="modal-subject">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>科目を追加</h2>
+      <input type="text" id="input-subject" placeholder="科目名" maxlength="20">
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-subject">キャンセル</button>
+        <button class="btn btn-primary" id="btn-save-subject">追加</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定（科目管理）モーダル -->
+  <div class="modal" id="modal-settings">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2>科目管理</h2>
+      <div id="subject-list"></div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-close-settings">閉じる</button>
+      </div>
+      <hr>
+      <h3>データ管理</h3>
+      <div class="data-actions">
+        <button class="btn" id="btn-export">エクスポート</button>
+        <button class="btn" id="btn-import">インポート</button>
+        <input type="file" id="file-import" accept=".json" hidden>
+      </div>
+      <div class="data-actions" style="margin-top:8px">
+        <button class="btn" id="btn-clear-demo">デモを消す</button>
+        <button class="btn" id="btn-insert-demo">デモを入れる</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="btn-settings" id="btn-settings" aria-label="設定">⚙</button>
+
+  <script src="app.js"></script>
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('sw.js');
+    }
+  </script>
+</body>
+</html>
