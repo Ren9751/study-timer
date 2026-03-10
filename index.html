@@ -13,10 +13,15 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <!-- Mini timer bar (タイマータブ以外で表示) -->
+  <div class="mini-timer-bar hidden" id="mini-timer-bar">
+    <span class="mini-timer-subject" id="mini-timer-subject"></span>
+    <span class="mini-timer-time" id="mini-timer-time">00:00:00</span>
+  </div>
+
   <div class="container">
     <nav class="tabs">
       <button class="tab active" data-tab="timer">タイマー</button>
-      <button class="tab" data-tab="log">ログ</button>
       <button class="tab" data-tab="stats">統計</button>
     </nav>
 
@@ -36,7 +41,10 @@
 
       <div class="timer-controls">
         <button class="btn btn-primary btn-large" id="btn-start" disabled>開始</button>
-        <button class="btn btn-save btn-large hidden" id="btn-save">保存</button>
+        <button class="btn btn-save btn-large hidden" id="btn-save">
+          <span class="btn-save-text">長押しで保存</span>
+          <span class="btn-save-progress"></span>
+        </button>
         <button class="btn btn-large hidden" id="btn-reset">リセット</button>
       </div>
 
@@ -47,8 +55,8 @@
       </div>
     </div>
 
-    <!-- ログタブ -->
-    <div id="tab-log" class="tab-content">
+    <!-- 統計タブ（カレンダー + ログ + グラフ統合） -->
+    <div id="tab-stats" class="tab-content">
       <div class="calendar" id="calendar">
         <div class="calendar-header">
           <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
@@ -62,17 +70,20 @@
       </div>
 
       <div class="day-detail" id="day-detail">
-        <h2 id="day-detail-date"></h2>
-        <div class="day-total" id="day-detail-total"></div>
+        <div class="day-detail-header">
+          <div>
+            <h2 id="day-detail-date"></h2>
+            <div class="day-total" id="day-detail-total"></div>
+          </div>
+          <button class="btn-icon btn-add-entry" id="btn-add-entry" aria-label="記録を追加">＋</button>
+        </div>
         <div class="day-entries" id="day-detail-entries"></div>
       </div>
-    </div>
 
-    <!-- 統計タブ -->
-    <div id="tab-stats" class="tab-content">
+      <hr class="section-divider">
+
       <div class="stats-period">
-        <button class="btn-period active" data-period="day">日</button>
-        <button class="btn-period" data-period="week">週</button>
+        <button class="btn-period active" data-period="week">週</button>
         <button class="btn-period" data-period="month">月</button>
         <button class="btn-period" data-period="year">年</button>
       </div>
@@ -112,7 +123,36 @@
     </div>
   </div>
 
-  <!-- 設定（科目管理）モーダル -->
+  <!-- 記録編集モーダル -->
+  <div class="modal" id="modal-entry">
+    <div class="modal-backdrop"></div>
+    <div class="modal-content">
+      <h2 id="modal-entry-title">記録を編集</h2>
+      <div class="form-group">
+        <label for="entry-edit-subject">科目</label>
+        <select id="entry-edit-subject"></select>
+      </div>
+      <div class="form-group">
+        <label>勉強時間</label>
+        <div class="time-input-group">
+          <input type="number" id="entry-edit-hours" min="0" max="23" value="0">
+          <span>時間</span>
+          <input type="number" id="entry-edit-minutes" min="0" max="59" value="0">
+          <span>分</span>
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="entry-edit-memo">メモ</label>
+        <textarea id="entry-edit-memo" rows="3" placeholder="メモを入力..."></textarea>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="btn-cancel-entry">キャンセル</button>
+        <button class="btn btn-primary" id="btn-save-entry">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 設定モーダル -->
   <div class="modal" id="modal-settings">
     <div class="modal-backdrop"></div>
     <div class="modal-content">

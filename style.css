@@ -20,6 +20,35 @@ body {
   padding: 0 16px 80px;
 }
 
+/* === Mini Timer Bar === */
+.mini-timer-bar {
+  position: sticky;
+  top: 0;
+  z-index: 200;
+  background: #1a3a2a;
+  padding: 10px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  border-bottom: 1px solid #4a9;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.mini-timer-subject {
+  font-size: 14px;
+  color: #4a9;
+  font-weight: 600;
+}
+
+.mini-timer-time {
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: #4a9;
+  font-weight: 600;
+}
+
 /* === Tabs === */
 .tabs {
   display: flex;
@@ -179,10 +208,38 @@ body {
   border-color: #4a9;
   color: #000;
   font-weight: 600;
+  position: relative;
+  overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
 }
 
 .btn-save:active {
   background: #3a8;
+}
+
+.btn-save-text {
+  position: relative;
+  z-index: 1;
+}
+
+.btn-save-progress {
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0;
+  background: rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.btn-save.pressing .btn-save-progress {
+  animation: press-fill 1s linear forwards;
+}
+
+@keyframes press-fill {
+  from { width: 0; }
+  to { width: 100%; }
 }
 
 .btn-icon {
@@ -231,24 +288,54 @@ body {
   background: #111;
   padding: 12px 16px;
   border-radius: 8px;
+  gap: 8px;
+}
+
+.entry-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.entry-top {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .entry-subject {
   font-size: 15px;
+  font-weight: 500;
+}
+
+.entry-time-range {
+  font-size: 12px;
+  color: #666;
+}
+
+.entry-memo {
+  font-size: 13px;
+  color: #888;
+  margin-top: 4px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .entry-time {
   font-size: 15px;
   color: #4a9;
   font-variant-numeric: tabular-nums;
+  flex-shrink: 0;
 }
 
 .entry-actions {
   display: flex;
   gap: 4px;
-  margin-left: 8px;
+  margin-left: 4px;
+  flex-shrink: 0;
 }
 
+.btn-edit-entry,
 .btn-delete-entry {
   width: 32px;
   height: 32px;
@@ -261,6 +348,11 @@ body {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+.btn-edit-entry:active {
+  background: #222;
+  color: #4a9;
 }
 
 .btn-delete-entry:active {
@@ -335,17 +427,33 @@ body {
 }
 
 /* === Day Detail === */
-.day-detail h2 {
+.day-detail {
+  margin-bottom: 8px;
+}
+
+.day-detail-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.day-detail-header h2 {
   font-size: 16px;
   color: #888;
-  margin-bottom: 4px;
+  margin-bottom: 2px;
 }
 
 .day-total {
   font-size: 20px;
   font-weight: 600;
   color: #4a9;
-  margin-bottom: 12px;
+}
+
+.btn-add-entry {
+  background: #1a3a2a;
+  border-color: #4a9;
+  color: #4a9;
 }
 
 .day-entries {
@@ -358,6 +466,13 @@ body {
   color: #555;
   font-size: 14px;
   padding: 16px 0;
+}
+
+/* === Section Divider === */
+.section-divider {
+  border: none;
+  border-top: 1px solid #222;
+  margin: 20px 0;
 }
 
 /* === Stats === */
@@ -547,6 +662,90 @@ body {
   display: flex;
   gap: 8px;
   justify-content: flex-end;
+}
+
+/* === Form Group (Entry Modal) === */
+.form-group {
+  margin-bottom: 16px;
+}
+
+.form-group label {
+  display: block;
+  font-size: 13px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.form-group select {
+  width: 100%;
+  padding: 12px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  min-height: 44px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='2' fill='none'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.form-group select:focus {
+  outline: none;
+  border-color: #4a9;
+}
+
+.time-input-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.time-input-group input {
+  width: 64px;
+  padding: 12px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  min-height: 44px;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.time-input-group input::-webkit-inner-spin-button,
+.time-input-group input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+}
+
+.time-input-group input:focus {
+  outline: none;
+  border-color: #4a9;
+}
+
+.time-input-group span {
+  font-size: 14px;
+  color: #888;
+}
+
+.form-group textarea {
+  width: 100%;
+  padding: 12px;
+  background: #222;
+  border: 1px solid #333;
+  border-radius: 8px;
+  color: #fff;
+  font-size: 16px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.form-group textarea:focus {
+  outline: none;
+  border-color: #4a9;
 }
 
 /* === Subject List (Settings) === */

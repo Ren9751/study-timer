@@ -1,7 +1,6 @@
 // === Utility Classes ===
 
 var DateUtils = {
-  // 午前3時を日付の境界にする（habit-trackerと同じ）
   today: function() {
     var now = new Date();
     if (now.getHours() < 3) {
@@ -30,7 +29,7 @@ var DateUtils = {
   getWeekStart: function(dateStr) {
     var d = this.parse(dateStr);
     var day = d.getDay();
-    var diff = day === 0 ? 6 : day - 1; // 月曜始まり
+    var diff = day === 0 ? 6 : day - 1;
     d.setDate(d.getDate() - diff);
     return this.format(d);
   },
@@ -80,22 +79,31 @@ function formatTimeShort(seconds) {
   return h + ':' + String(m).padStart(2, '0') + ':' + String(s).padStart(2, '0');
 }
 
+function formatHM(timeStr) {
+  return timeStr || '';
+}
+
 // === Main App ===
 
 function StudyTimer() {
-  // State
   this.subjects = Store.get('subjects') || [];
   this.timerRunning = false;
   this.timerPaused = false;
   this.timerStart = null;
-  this.timerAccumulated = 0; // 一時停止前の累積秒数
+  this.timerAccumulated = 0;
   this.timerInterval = null;
+  this.timerRealStart = null; // 実際の開始時刻(Date.now())
   this.currentSubject = '';
   this.calendarYear = new Date().getFullYear();
   this.calendarMonth = new Date().getMonth();
   this.selectedDate = DateUtils.today();
-  this.statsPeriod = 'day';
-  this.statsOffset = 0; // 0=今、-1=前の期間...
+  this.statsPeriod = 'week';
+  this.statsOffset = 0;
+  this.currentTab = 'timer';
+
+  // Entry editing state
+  this.editingEntryDate = null;
+  this.editingEntryId = null; // null = add mode
 
   this.init();
 }
@@ -105,9 +113,6 @@ StudyTimer.prototype.init = function() {
   this.restoreTimer();
   this.renderSubjectSelect();
   this.renderToday();
-  this.renderCalendar();
-  this.renderDayDetail();
-  this.renderStats();
 };
 
 // === Event Binding ===
@@ -122,7 +127,7 @@ StudyTimer.prototype.bindEvents = function() {
     });
   });
 
-  // Timer
+  // Timer start/pause
   document.getElementById('btn-start').addEventListener('click', function() {
     if (self.timerRunning) {
       self.pauseTimer();
@@ -131,15 +136,38 @@ StudyTimer.prototype.bindEvents = function() {
     }
   });
 
-  document.getElementById('btn-save').addEventListener('click', function() {
-    self.saveAndReset();
-  });
+  // Long press save
+  var saveBtn = document.getElementById('btn-save');
+  var pressTimer = null;
 
+  var startPress = function(e) {
+    e.preventDefault();
+    saveBtn.classList.add('pressing');
+    pressTimer = setTimeout(function() {
+      saveBtn.classList.remove('pressing');
+      self.saveAndReset();
+    }, 1000);
+  };
+
+  var cancelPress = function() {
+    clearTimeout(pressTimer);
+    saveBtn.classList.remove('pressing');
+  };
+
+  saveBtn.addEventListener('touchstart', startPress, { passive: false });
+  saveBtn.addEventListener('touchend', cancelPress);
+  saveBtn.addEventListener('touchcancel', cancelPress);
+  saveBtn.addEventListener('mousedown', startPress);
+  saveBtn.addEventListener('mouseup', cancelPress);
+  saveBtn.addEventListener('mouseleave', cancelPress);
+
+  // Reset
   document.getElementById('btn-reset').addEventListener('click', function() {
     if (!confirm('タイマーをリセットしますか？記録は保存されません。')) return;
     self.resetTimer();
   });
 
+  // Subject select
   document.getElementById('subject-select').addEventListener('change', function() {
     self.currentSubject = this.value;
     var btn = document.getElementById('btn-start');
@@ -190,12 +218,14 @@ StudyTimer.prototype.bindEvents = function() {
     keys.forEach(function(key) { Store.remove(key); });
     self.subjects = [];
     Store.remove('subjects');
-    Store.set('demoDataInserted', true); // 自動再投入を防ぐ
+    Store.set('demoDataInserted', true);
     self.renderSubjectSelect();
     self.renderToday();
-    self.renderCalendar();
-    self.renderDayDetail();
-    self.renderStats();
+    if (self.currentTab === 'stats') {
+      self.renderCalendar();
+      self.renderDayDetail();
+      self.renderStats();
+    }
     self.closeModal('modal-settings');
   });
 
@@ -256,6 +286,25 @@ StudyTimer.prototype.bindEvents = function() {
     }
   });
 
+  // Add entry button
+  document.getElementById('btn-add-entry').addEventListener('click', function() {
+    self.openEntryModal(self.selectedDate, null);
+  });
+
+  // Entry modal save/cancel
+  document.getElementById('btn-save-entry').addEventListener('click', function() {
+    self.saveEntryFromModal();
+  });
+
+  document.getElementById('btn-cancel-entry').addEventListener('click', function() {
+    self.closeModal('modal-entry');
+  });
+
+  // Mini timer bar click -> switch to timer tab
+  document.getElementById('mini-timer-bar').addEventListener('click', function() {
+    self.switchTab('timer');
+  });
+
   // Modal backdrop close
   document.querySelectorAll('.modal-backdrop').forEach(function(backdrop) {
     backdrop.addEventListener('click', function() {
@@ -263,12 +312,12 @@ StudyTimer.prototype.bindEvents = function() {
     });
   });
 
-  // ページ離脱時にタイマー状態を保存
+  // Save timer state on page unload
   window.addEventListener('beforeunload', function() {
     self.saveTimerState();
   });
 
-  // visibilitychangeでもタイマー表示を更新（スマホでバックグラウンドから戻った時）
+  // Update timer display when returning from background
   document.addEventListener('visibilitychange', function() {
     if (!document.hidden && self.timerRunning) {
       self.updateTimerDisplay();
@@ -279,16 +328,40 @@ StudyTimer.prototype.bindEvents = function() {
 // === Tab switching ===
 
 StudyTimer.prototype.switchTab = function(tabName) {
+  this.currentTab = tabName;
+
   document.querySelectorAll('.tab').forEach(function(t) { t.classList.remove('active'); });
   document.querySelectorAll('.tab-content').forEach(function(c) { c.classList.remove('active'); });
   document.querySelector('.tab[data-tab="' + tabName + '"]').classList.add('active');
   document.getElementById('tab-' + tabName).classList.add('active');
 
-  if (tabName === 'log') {
+  // Mini timer bar: show on non-timer tabs when timer is active
+  this.updateMiniTimerBar();
+
+  if (tabName === 'stats') {
     this.renderCalendar();
     this.renderDayDetail();
-  } else if (tabName === 'stats') {
     this.renderStats();
+  }
+};
+
+// === Mini Timer Bar ===
+
+StudyTimer.prototype.updateMiniTimerBar = function() {
+  var bar = document.getElementById('mini-timer-bar');
+  var showBar = this.currentTab !== 'timer' && (this.timerRunning || this.timerPaused);
+
+  if (showBar) {
+    bar.classList.remove('hidden');
+    document.getElementById('mini-timer-subject').textContent = this.currentSubject;
+    if (this.timerRunning) {
+      var elapsed = this.timerAccumulated + Math.floor((Date.now() - this.timerStart) / 1000);
+      document.getElementById('mini-timer-time').textContent = formatTime(elapsed);
+    } else {
+      document.getElementById('mini-timer-time').textContent = formatTime(this.timerAccumulated);
+    }
+  } else {
+    bar.classList.add('hidden');
   }
 };
 
@@ -300,9 +373,15 @@ StudyTimer.prototype.startTimer = function() {
   this.timerPaused = false;
   this.timerStart = Date.now();
 
+  // Track real start time (only on first start, not resume)
+  if (!this.timerRealStart) {
+    this.timerRealStart = Date.now();
+  }
+
   var self = this;
   this.timerInterval = setInterval(function() {
     self.updateTimerDisplay();
+    self.updateMiniTimerBar();
   }, 1000);
 
   this.updateTimerUI();
@@ -311,7 +390,6 @@ StudyTimer.prototype.startTimer = function() {
 
 StudyTimer.prototype.pauseTimer = function() {
   if (!this.timerRunning) return;
-  // 現在の区間の経過を累積に加算
   this.timerAccumulated += Math.floor((Date.now() - this.timerStart) / 1000);
   clearInterval(this.timerInterval);
   this.timerInterval = null;
@@ -320,15 +398,21 @@ StudyTimer.prototype.pauseTimer = function() {
   this.timerStart = null;
 
   this.updateTimerUI();
+  this.updateMiniTimerBar();
   this.saveTimerState();
 };
 
 StudyTimer.prototype.saveAndReset = function() {
-  // 動作中なら現在区間も加算
   var total = this.timerAccumulated;
   if (this.timerRunning && this.timerStart) {
     total += Math.floor((Date.now() - this.timerStart) / 1000);
   }
+
+  // Calculate start/end time strings
+  var endTime = new Date();
+  var startTime = this.timerRealStart ? new Date(this.timerRealStart) : new Date(endTime.getTime() - total * 1000);
+  var startStr = String(startTime.getHours()).padStart(2, '0') + ':' + String(startTime.getMinutes()).padStart(2, '0');
+  var endStr = String(endTime.getHours()).padStart(2, '0') + ':' + String(endTime.getMinutes()).padStart(2, '0');
 
   clearInterval(this.timerInterval);
   this.timerInterval = null;
@@ -336,13 +420,18 @@ StudyTimer.prototype.saveAndReset = function() {
   this.timerPaused = false;
   this.timerStart = null;
   this.timerAccumulated = 0;
-
-  if (total >= 1) {
-    this.saveEntry(this.currentSubject, total);
-  }
+  this.timerRealStart = null;
 
   this.clearTimerState();
   this.updateTimerUI();
+  this.updateMiniTimerBar();
+
+  if (total < 60) {
+    alert('1分以上勉強してから保存してね');
+    return;
+  }
+
+  this.saveEntry(this.currentSubject, total, startStr, endStr, '');
   this.renderToday();
 };
 
@@ -353,8 +442,10 @@ StudyTimer.prototype.resetTimer = function() {
   this.timerPaused = false;
   this.timerStart = null;
   this.timerAccumulated = 0;
+  this.timerRealStart = null;
   this.clearTimerState();
   this.updateTimerUI();
+  this.updateMiniTimerBar();
 };
 
 StudyTimer.prototype.updateTimerDisplay = function() {
@@ -370,11 +461,9 @@ StudyTimer.prototype.updateTimerUI = function() {
   var subjectLabel = document.getElementById('timer-subject-label');
   var select = document.getElementById('subject-select');
 
-  // クラスをリセット
   btn.classList.remove('btn-primary', 'btn-pause', 'btn-stop');
 
   if (this.timerRunning) {
-    // 計測中 → 一時停止ボタン + 保存・リセットボタン
     btn.textContent = '一時停止';
     btn.classList.add('btn-pause');
     btn.disabled = false;
@@ -384,7 +473,6 @@ StudyTimer.prototype.updateTimerUI = function() {
     subjectLabel.textContent = this.currentSubject;
     select.disabled = true;
   } else if (this.timerPaused) {
-    // 一時停止中 → 再開ボタン + 保存・リセットボタン
     btn.textContent = '再開';
     btn.classList.add('btn-stop');
     btn.disabled = false;
@@ -395,7 +483,6 @@ StudyTimer.prototype.updateTimerUI = function() {
     subjectLabel.textContent = this.currentSubject;
     select.disabled = true;
   } else {
-    // 停止中 → 開始ボタンのみ
     btn.textContent = '開始';
     btn.classList.add('btn-primary');
     btn.disabled = !this.currentSubject;
@@ -408,14 +495,15 @@ StudyTimer.prototype.updateTimerUI = function() {
   }
 };
 
-// タイマー状態の保存・復元（ブラウザ閉じても継続）
+// Timer state persistence
 StudyTimer.prototype.saveTimerState = function() {
   if (this.timerRunning || this.timerPaused) {
     Store.set('timerState', {
       subject: this.currentSubject,
       startTime: this.timerStart,
       accumulated: this.timerAccumulated,
-      paused: this.timerPaused
+      paused: this.timerPaused,
+      realStartTime: this.timerRealStart
     });
   }
 };
@@ -430,23 +518,23 @@ StudyTimer.prototype.restoreTimer = function() {
 
   this.currentSubject = state.subject;
   this.timerAccumulated = state.accumulated || 0;
+  this.timerRealStart = state.realStartTime || null;
 
   var select = document.getElementById('subject-select');
   select.value = this.currentSubject;
 
   if (state.paused) {
-    // 一時停止中だった
     this.timerPaused = true;
     this.timerRunning = false;
     this.timerStart = null;
   } else {
-    // 計測中だった
     this.timerStart = state.startTime;
     this.timerRunning = true;
 
     var self = this;
     this.timerInterval = setInterval(function() {
       self.updateTimerDisplay();
+      self.updateMiniTimerBar();
     }, 1000);
 
     this.updateTimerDisplay();
@@ -457,7 +545,7 @@ StudyTimer.prototype.restoreTimer = function() {
 
 // === Entries (ログ) ===
 
-StudyTimer.prototype.saveEntry = function(subject, seconds) {
+StudyTimer.prototype.saveEntry = function(subject, seconds, startTime, endTime, memo) {
   var today = DateUtils.today();
   var key = 'log-' + today;
   var log = Store.get(key) || { date: today, entries: [] };
@@ -466,7 +554,40 @@ StudyTimer.prototype.saveEntry = function(subject, seconds) {
     id: Date.now(),
     subject: subject,
     seconds: seconds,
-    time: new Date().toTimeString().substring(0, 5)
+    startTime: startTime || '',
+    endTime: endTime || '',
+    memo: memo || ''
+  });
+
+  Store.set(key, log);
+};
+
+StudyTimer.prototype.updateEntry = function(dateStr, entryId, updates) {
+  var key = 'log-' + dateStr;
+  var log = Store.get(key);
+  if (!log) return;
+
+  log.entries = log.entries.map(function(e) {
+    if (e.id === entryId) {
+      return Object.assign({}, e, updates);
+    }
+    return e;
+  });
+
+  Store.set(key, log);
+};
+
+StudyTimer.prototype.addManualEntry = function(dateStr, subject, seconds, memo) {
+  var key = 'log-' + dateStr;
+  var log = Store.get(key) || { date: dateStr, entries: [] };
+
+  log.entries.push({
+    id: Date.now(),
+    subject: subject,
+    seconds: seconds,
+    startTime: '',
+    endTime: '',
+    memo: memo || ''
   });
 
   Store.set(key, log);
@@ -496,6 +617,76 @@ StudyTimer.prototype.getDayTotal = function(dateStr) {
   return log.entries.reduce(function(sum, e) { return sum + e.seconds; }, 0);
 };
 
+// === Entry Edit Modal ===
+
+StudyTimer.prototype.openEntryModal = function(dateStr, entry) {
+  this.editingEntryDate = dateStr;
+  this.editingEntryId = entry ? entry.id : null;
+
+  var title = document.getElementById('modal-entry-title');
+  title.textContent = entry ? '記録を編集' : '記録を追加';
+
+  // Populate subject dropdown
+  var select = document.getElementById('entry-edit-subject');
+  var options = '';
+  this.subjects.forEach(function(s) {
+    options += '<option value="' + s + '">' + s + '</option>';
+  });
+  select.innerHTML = options;
+
+  if (entry) {
+    select.value = entry.subject;
+    var h = Math.floor(entry.seconds / 3600);
+    var m = Math.floor((entry.seconds % 3600) / 60);
+    document.getElementById('entry-edit-hours').value = h;
+    document.getElementById('entry-edit-minutes').value = m;
+    document.getElementById('entry-edit-memo').value = entry.memo || '';
+  } else {
+    select.value = this.subjects[0] || '';
+    document.getElementById('entry-edit-hours').value = 0;
+    document.getElementById('entry-edit-minutes').value = 0;
+    document.getElementById('entry-edit-memo').value = '';
+  }
+
+  this.openModal('modal-entry');
+};
+
+StudyTimer.prototype.saveEntryFromModal = function() {
+  var subject = document.getElementById('entry-edit-subject').value;
+  var hours = parseInt(document.getElementById('entry-edit-hours').value) || 0;
+  var minutes = parseInt(document.getElementById('entry-edit-minutes').value) || 0;
+  var memo = document.getElementById('entry-edit-memo').value.trim();
+  var seconds = hours * 3600 + minutes * 60;
+
+  if (!subject) return;
+  if (seconds < 60) {
+    alert('1分以上の時間を入力してください');
+    return;
+  }
+
+  if (this.editingEntryId) {
+    // Edit mode
+    this.updateEntry(this.editingEntryDate, this.editingEntryId, {
+      subject: subject,
+      seconds: seconds,
+      memo: memo
+    });
+  } else {
+    // Add mode
+    this.addManualEntry(this.editingEntryDate, subject, seconds, memo);
+  }
+
+  this.closeModal('modal-entry');
+  this.renderDayDetail();
+  this.renderCalendar();
+  this.renderStats();
+
+  // Also update today view if editing today
+  if (this.editingEntryDate === DateUtils.today()) {
+    this.renderToday();
+  }
+};
+
 // === Subjects ===
 
 StudyTimer.prototype.addSubject = function() {
@@ -509,7 +700,6 @@ StudyTimer.prototype.addSubject = function() {
   this.closeModal('modal-subject');
   this.renderSubjectSelect();
 
-  // 追加した科目を選択状態にする
   var select = document.getElementById('subject-select');
   select.value = name;
   this.currentSubject = name;
@@ -567,7 +757,6 @@ StudyTimer.prototype.renderSubjectList = function() {
     edit.className = 'subject-item-edit';
     edit.textContent = '✎';
     edit.addEventListener('click', function() {
-      // インライン編集に切り替え
       name.style.display = 'none';
       actions.style.display = 'none';
 
@@ -584,7 +773,6 @@ StudyTimer.prototype.renderSubjectList = function() {
       var doSave = function() {
         var newName = input.value.trim();
         if (!newName || newName === s) {
-          // 変更なしなら元に戻す
           item.removeChild(input);
           item.removeChild(saveBtn);
           name.style.display = '';
@@ -633,13 +821,11 @@ StudyTimer.prototype.renderSubjectList = function() {
 };
 
 StudyTimer.prototype.renameSubject = function(oldName, newName) {
-  // 科目リストを更新
   var idx = this.subjects.indexOf(oldName);
   if (idx === -1) return;
   this.subjects[idx] = newName;
   Store.set('subjects', this.subjects);
 
-  // 全ログの科目名を更新
   for (var i = 0; i < localStorage.length; i++) {
     var key = localStorage.key(i);
     if (key && key.indexOf('log-') === 0) {
@@ -657,7 +843,6 @@ StudyTimer.prototype.renameSubject = function(oldName, newName) {
     }
   }
 
-  // 現在選択中の科目も更新
   if (this.currentSubject === oldName) {
     this.currentSubject = newName;
   }
@@ -686,38 +871,93 @@ StudyTimer.prototype.renderToday = function() {
   }
 
   container.innerHTML = '';
-  // 新しい順
   entries.slice().reverse().forEach(function(entry) {
-    var item = document.createElement('div');
-    item.className = 'entry-item';
-
-    var subject = document.createElement('span');
-    subject.className = 'entry-subject';
-    subject.textContent = entry.subject;
-
-    var time = document.createElement('span');
-    time.className = 'entry-time';
-    time.textContent = formatTimeShort(entry.seconds);
-
-    var actions = document.createElement('div');
-    actions.className = 'entry-actions';
-
-    var del = document.createElement('button');
-    del.className = 'btn-delete-entry';
-    del.textContent = '×';
-    del.addEventListener('click', function() {
-      if (confirm('この記録を削除しますか？')) {
-        self.deleteEntry(today, entry.id);
-        self.renderToday();
-      }
-    });
-
-    actions.appendChild(del);
-    item.appendChild(subject);
-    item.appendChild(time);
-    item.appendChild(actions);
-    container.appendChild(item);
+    container.appendChild(self.createEntryItem(entry, today, true));
   });
+};
+
+// === Shared entry item renderer ===
+
+StudyTimer.prototype.createEntryItem = function(entry, dateStr, showEdit) {
+  var self = this;
+  var item = document.createElement('div');
+  item.className = 'entry-item';
+
+  var info = document.createElement('div');
+  info.className = 'entry-info';
+
+  var top = document.createElement('div');
+  top.className = 'entry-top';
+
+  var subject = document.createElement('span');
+  subject.className = 'entry-subject';
+  subject.textContent = entry.subject;
+  top.appendChild(subject);
+
+  // Time range display
+  var timeRange = '';
+  if (entry.startTime && entry.endTime) {
+    timeRange = entry.startTime + ' - ' + entry.endTime;
+  } else if (entry.startTime) {
+    timeRange = entry.startTime;
+  } else if (entry.time) {
+    // Legacy format
+    timeRange = entry.time;
+  }
+  if (timeRange) {
+    var rangeEl = document.createElement('span');
+    rangeEl.className = 'entry-time-range';
+    rangeEl.textContent = timeRange;
+    top.appendChild(rangeEl);
+  }
+
+  info.appendChild(top);
+
+  // Memo
+  if (entry.memo) {
+    var memoEl = document.createElement('div');
+    memoEl.className = 'entry-memo';
+    memoEl.textContent = entry.memo;
+    info.appendChild(memoEl);
+  }
+
+  var time = document.createElement('span');
+  time.className = 'entry-time';
+  time.textContent = formatTimeShort(entry.seconds);
+
+  var actions = document.createElement('div');
+  actions.className = 'entry-actions';
+
+  if (showEdit) {
+    var editBtn = document.createElement('button');
+    editBtn.className = 'btn-edit-entry';
+    editBtn.textContent = '✎';
+    editBtn.addEventListener('click', function() {
+      self.openEntryModal(dateStr, entry);
+    });
+    actions.appendChild(editBtn);
+  }
+
+  var del = document.createElement('button');
+  del.className = 'btn-delete-entry';
+  del.textContent = '×';
+  del.addEventListener('click', function() {
+    if (confirm('この記録を削除しますか？')) {
+      self.deleteEntry(dateStr, entry.id);
+      self.renderToday();
+      if (self.currentTab === 'stats') {
+        self.renderCalendar();
+        self.renderDayDetail();
+        self.renderStats();
+      }
+    }
+  });
+  actions.appendChild(del);
+
+  item.appendChild(info);
+  item.appendChild(time);
+  item.appendChild(actions);
+  return item;
 };
 
 // === Calendar ===
@@ -731,13 +971,12 @@ StudyTimer.prototype.renderCalendar = function() {
   var firstDay = new Date(year, month, 1);
   var lastDay = new Date(year, month + 1, 0);
   var startWeekday = firstDay.getDay();
-  startWeekday = startWeekday === 0 ? 6 : startWeekday - 1; // 月曜始まり
+  startWeekday = startWeekday === 0 ? 6 : startWeekday - 1;
 
   var container = document.getElementById('cal-days');
   container.innerHTML = '';
   var self = this;
 
-  // 空白セル
   for (var i = 0; i < startWeekday; i++) {
     var empty = document.createElement('div');
     empty.className = 'cal-day empty';
@@ -755,7 +994,6 @@ StudyTimer.prototype.renderCalendar = function() {
     if (dateStr === today) cell.classList.add('today');
     if (dateStr === this.selectedDate) cell.classList.add('selected');
 
-    // ログの有無でヒートマップ
     var total = this.getDayTotal(dateStr);
     if (total > 0) {
       var hours = total / 3600;
@@ -789,6 +1027,7 @@ StudyTimer.prototype.renderDayDetail = function() {
   document.getElementById('day-detail-total').textContent = formatTimeShort(total);
 
   var container = document.getElementById('day-detail-entries');
+  var self = this;
 
   if (entries.length === 0) {
     container.innerHTML = '<p class="no-entries">記録なし</p>';
@@ -797,36 +1036,7 @@ StudyTimer.prototype.renderDayDetail = function() {
 
   container.innerHTML = '';
   entries.forEach(function(entry) {
-    var item = document.createElement('div');
-    item.className = 'entry-item';
-
-    var subject = document.createElement('span');
-    subject.className = 'entry-subject';
-    subject.textContent = entry.subject + (entry.time ? ' (' + entry.time + ')' : '');
-
-    var time = document.createElement('span');
-    time.className = 'entry-time';
-    time.textContent = formatTimeShort(entry.seconds);
-
-    var actions = document.createElement('div');
-    actions.className = 'entry-actions';
-
-    var del = document.createElement('button');
-    del.className = 'btn-delete-entry';
-    del.textContent = '×';
-    del.addEventListener('click', function() {
-      if (confirm('この記録を削除しますか？')) {
-        self.deleteEntry(dateStr, entry.id);
-        self.renderCalendar();
-        self.renderDayDetail();
-      }
-    });
-
-    actions.appendChild(del);
-    item.appendChild(subject);
-    item.appendChild(time);
-    item.appendChild(actions);
-    container.appendChild(item);
+    container.appendChild(self.createEntryItem(entry, dateStr, true));
   });
 };
 
@@ -841,18 +1051,13 @@ StudyTimer.prototype.renderStats = function() {
   var today = DateUtils.today();
   var period = this.statsPeriod;
   var offset = this.statsOffset;
-  var DAYS = ['日', '月', '火', '水', '木', '金', '土'];
-  var DAYS_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
-  // 期間の起点と終点を計算
   var range = this.getStatsRange(period, offset, today);
   var label = range.label;
-  var barData = range.barData; // [{label, dateKeys}]
+  var barData = range.barData;
 
-  // ナビラベル
   document.getElementById('stats-nav-label').textContent = label;
 
-  // データ収集
   var grandTotal = 0;
   var subjectTotals = {};
 
@@ -862,6 +1067,7 @@ StudyTimer.prototype.renderStats = function() {
       var log = Store.get('log-' + dateStr);
       if (log && log.entries) {
         log.entries.forEach(function(entry) {
+          if (!entry.subject || typeof entry.seconds !== 'number') return;
           bar.seconds += entry.seconds;
           grandTotal += entry.seconds;
           subjectTotals[entry.subject] = (subjectTotals[entry.subject] || 0) + entry.seconds;
@@ -872,12 +1078,10 @@ StudyTimer.prototype.renderStats = function() {
 
   document.getElementById('stats-total-time').textContent = formatTimeShort(grandTotal);
 
-  // 棒グラフ描画
   var labels = barData.map(function(b) { return b.label; });
-  var values = barData.map(function(b) { return b.seconds / 3600; }); // 時間に変換
+  var values = barData.map(function(b) { return b.seconds / 3600; });
   this.drawBarChart(labels, values);
 
-  // ドーナツチャート描画
   var subjectEntries = Object.keys(subjectTotals).map(function(s) {
     return { name: s, seconds: subjectTotals[s] };
   }).sort(function(a, b) { return b.seconds - a.seconds; });
@@ -886,18 +1090,9 @@ StudyTimer.prototype.renderStats = function() {
 };
 
 StudyTimer.prototype.getStatsRange = function(period, offset, today) {
-  var DAYS = ['日', '月', '火', '水', '木', '金', '土'];
   var result = { label: '', barData: [] };
 
-  if (period === 'day') {
-    var d = DateUtils.parse(DateUtils.addDays(today, offset));
-    var dateStr = DateUtils.format(d);
-    var dayName = DAYS[d.getDay()];
-    result.label = (d.getMonth() + 1) + '/' + d.getDate() + '(' + dayName + ')';
-    result.barData = [{ label: dayName, dateKeys: [dateStr] }];
-
-  } else if (period === 'week') {
-    // 今週の月曜を基準に offset 週ずらす
+  if (period === 'week') {
     var weekStart = DateUtils.parse(DateUtils.getWeekStart(today));
     weekStart.setDate(weekStart.getDate() + offset * 7);
     var weekEnd = new Date(weekStart);
@@ -927,7 +1122,6 @@ StudyTimer.prototype.getStatsRange = function(period, offset, today) {
 
     for (var i = 1; i <= daysInMonth; i++) {
       var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(i).padStart(2, '0');
-      // 5日おきにラベル表示、それ以外は空
       var lbl = (i % 5 === 0 || i === 1) ? String(i) : '';
       result.barData.push({ label: lbl, dateKeys: [dateStr] });
     }
@@ -967,12 +1161,10 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
   var padBottom = 28;
   var chartW = W - padLeft - padRight;
   var chartH = H - padTop - padBottom;
-  var maxVal = 12; // Y軸は固定12h
+  var maxVal = 12;
 
-  // 背景クリア
   ctx.clearRect(0, 0, W, H);
 
-  // グリッド線 + Y軸ラベル
   ctx.strokeStyle = '#222';
   ctx.lineWidth = 1;
   ctx.fillStyle = '#555';
@@ -990,7 +1182,6 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
     ctx.fillText(v + 'h', padLeft - 6, y);
   });
 
-  // 棒グラフ
   var barCount = labels.length;
   var gap = Math.max(2, Math.min(6, chartW / barCount * 0.2));
   var barW = (chartW - gap * (barCount + 1)) / barCount;
@@ -1003,7 +1194,6 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
     if (barH > 0) {
       var radius = Math.min(3, barW / 2);
       var y = padTop + chartH - barH;
-      // 丸角の棒
       ctx.beginPath();
       ctx.moveTo(x, padTop + chartH);
       ctx.lineTo(x, y + radius);
@@ -1016,7 +1206,6 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
     }
   }
 
-  // X軸ラベル
   ctx.fillStyle = '#666';
   ctx.font = '10px -apple-system, sans-serif';
   ctx.textAlign = 'center';
@@ -1043,20 +1232,17 @@ StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal) {
   ctx.clearRect(0, 0, 140, 140);
 
   if (grandTotal === 0 || subjectEntries.length === 0) {
-    // データなし → グレーのリング
     ctx.beginPath();
     ctx.arc(cx, cy, r, 0, Math.PI * 2);
     ctx.arc(cx, cy, r - thickness, 0, Math.PI * 2, true);
     ctx.fillStyle = '#222';
     ctx.fill();
 
-    // 凡例クリア
     document.getElementById('stats-donut-legend').innerHTML =
       '<p class="no-entries" style="font-size:13px">データなし</p>';
     return;
   }
 
-  // 描画
   var startAngle = -Math.PI / 2;
   subjectEntries.forEach(function(entry, idx) {
     var slice = (entry.seconds / grandTotal) * Math.PI * 2;
@@ -1073,7 +1259,6 @@ StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal) {
     startAngle = endAngle;
   });
 
-  // 凡例
   var legend = document.getElementById('stats-donut-legend');
   legend.innerHTML = '';
   subjectEntries.forEach(function(entry, idx) {
@@ -1156,9 +1341,11 @@ StudyTimer.prototype.importData = function(event) {
 
       self.renderSubjectSelect();
       self.renderToday();
-      self.renderCalendar();
-      self.renderDayDetail();
-      self.renderStats();
+      if (self.currentTab === 'stats') {
+        self.renderCalendar();
+        self.renderDayDetail();
+        self.renderStats();
+      }
       self.closeModal('modal-settings');
       alert('インポート完了');
     } catch(err) {
@@ -1169,9 +1356,8 @@ StudyTimer.prototype.importData = function(event) {
   event.target.value = '';
 };
 
-// === Demo Data (統計確認用) ===
+// === Demo Data ===
 StudyTimer.prototype.insertDemoData = function() {
-  // 既にデモデータが入っていたらスキップ
   if (Store.get('demoDataInserted')) return;
 
   var subjects = ['数学', '英語', '物理', '国語', '化学'];
@@ -1179,24 +1365,25 @@ StudyTimer.prototype.insertDemoData = function() {
   Store.set('subjects', subjects);
 
   var today = DateUtils.today();
-  var todayDate = DateUtils.parse(today);
 
-  // 過去21日分のデータを生成
   for (var i = 1; i <= 21; i++) {
     var dateStr = DateUtils.addDays(today, -i);
     var entries = [];
-    // 1日に1〜3科目の記録をランダムに
     var numEntries = 1 + Math.floor(Math.random() * 3);
     for (var j = 0; j < numEntries; j++) {
       var subjectIdx = Math.floor(Math.random() * subjects.length);
-      var seconds = 1200 + Math.floor(Math.random() * 5400); // 20分〜110分
-      var hour = 9 + Math.floor(Math.random() * 12);
-      var minute = Math.floor(Math.random() * 60);
+      var seconds = 1200 + Math.floor(Math.random() * 5400);
+      var startHour = 9 + Math.floor(Math.random() * 12);
+      var startMin = Math.floor(Math.random() * 60);
+      var endDate = new Date(2026, 0, 1, startHour, startMin);
+      endDate.setSeconds(endDate.getSeconds() + seconds);
       entries.push({
         id: Date.now() - i * 100000 - j * 1000,
         subject: subjects[subjectIdx],
         seconds: seconds,
-        time: String(hour).padStart(2, '0') + ':' + String(minute).padStart(2, '0')
+        startTime: String(startHour).padStart(2, '0') + ':' + String(startMin).padStart(2, '0'),
+        endTime: String(endDate.getHours()).padStart(2, '0') + ':' + String(endDate.getMinutes()).padStart(2, '0'),
+        memo: ''
       });
     }
     var key = 'log-' + dateStr;
@@ -1206,9 +1393,6 @@ StudyTimer.prototype.insertDemoData = function() {
   Store.set('demoDataInserted', true);
   this.renderSubjectSelect();
   this.renderToday();
-  this.renderCalendar();
-  this.renderDayDetail();
-  this.renderStats();
 };
 
 // === Init ===
