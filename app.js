@@ -577,7 +577,7 @@ StudyTimer.prototype.updateEntry = function(dateStr, entryId, updates) {
   Store.set(key, log);
 };
 
-StudyTimer.prototype.addManualEntry = function(dateStr, subject, seconds, memo) {
+StudyTimer.prototype.addManualEntry = function(dateStr, subject, seconds, memo, startTime, endTime) {
   var key = 'log-' + dateStr;
   var log = Store.get(key) || { date: dateStr, entries: [] };
 
@@ -585,8 +585,8 @@ StudyTimer.prototype.addManualEntry = function(dateStr, subject, seconds, memo) 
     id: Date.now(),
     subject: subject,
     seconds: seconds,
-    startTime: '',
-    endTime: '',
+    startTime: startTime || '',
+    endTime: endTime || '',
     memo: memo || ''
   });
 
@@ -636,15 +636,19 @@ StudyTimer.prototype.openEntryModal = function(dateStr, entry) {
 
   if (entry) {
     select.value = entry.subject;
-    var h = Math.floor(entry.seconds / 3600);
-    var m = Math.floor((entry.seconds % 3600) / 60);
-    document.getElementById('entry-edit-hours').value = h;
-    document.getElementById('entry-edit-minutes').value = m;
+    document.getElementById('entry-edit-start').value = entry.startTime || '09:00';
+    document.getElementById('entry-edit-end').value = entry.endTime || '10:00';
     document.getElementById('entry-edit-memo').value = entry.memo || '';
   } else {
     select.value = this.subjects[0] || '';
-    document.getElementById('entry-edit-hours').value = 0;
-    document.getElementById('entry-edit-minutes').value = 0;
+    // Default to current time - 1h ~ current time
+    var now = new Date();
+    var endStr = String(now.getHours()).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    var startH = now.getHours() - 1;
+    if (startH < 0) startH = 0;
+    var startStr = String(startH).padStart(2, '0') + ':' + String(now.getMinutes()).padStart(2, '0');
+    document.getElementById('entry-edit-start').value = startStr;
+    document.getElementById('entry-edit-end').value = endStr;
     document.getElementById('entry-edit-memo').value = '';
   }
 
@@ -653,27 +657,40 @@ StudyTimer.prototype.openEntryModal = function(dateStr, entry) {
 
 StudyTimer.prototype.saveEntryFromModal = function() {
   var subject = document.getElementById('entry-edit-subject').value;
-  var hours = parseInt(document.getElementById('entry-edit-hours').value) || 0;
-  var minutes = parseInt(document.getElementById('entry-edit-minutes').value) || 0;
+  var startTime = document.getElementById('entry-edit-start').value;
+  var endTime = document.getElementById('entry-edit-end').value;
   var memo = document.getElementById('entry-edit-memo').value.trim();
-  var seconds = hours * 3600 + minutes * 60;
 
   if (!subject) return;
+  if (!startTime || !endTime) {
+    alert('開始時刻と終了時刻を入力してください');
+    return;
+  }
+
+  // Calculate seconds from time range
+  var startParts = startTime.split(':');
+  var endParts = endTime.split(':');
+  var startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+  var endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+  // Handle overnight (e.g. 23:00 - 01:00)
+  if (endMin <= startMin) endMin += 24 * 60;
+  var seconds = (endMin - startMin) * 60;
+
   if (seconds < 60) {
     alert('1分以上の時間を入力してください');
     return;
   }
 
   if (this.editingEntryId) {
-    // Edit mode
     this.updateEntry(this.editingEntryDate, this.editingEntryId, {
       subject: subject,
       seconds: seconds,
+      startTime: startTime,
+      endTime: endTime,
       memo: memo
     });
   } else {
-    // Add mode
-    this.addManualEntry(this.editingEntryDate, subject, seconds, memo);
+    this.addManualEntry(this.editingEntryDate, subject, seconds, memo, startTime, endTime);
   }
 
   this.closeModal('modal-entry');

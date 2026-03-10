@@ -133,12 +133,11 @@
         <select id="entry-edit-subject"></select>
       </div>
       <div class="form-group">
-        <label>勉強時間</label>
+        <label>時間</label>
         <div class="time-input-group">
-          <input type="number" id="entry-edit-hours" min="0" max="23" value="0">
-          <span>時間</span>
-          <input type="number" id="entry-edit-minutes" min="0" max="59" value="0">
-          <span>分</span>
+          <input type="time" id="entry-edit-start" value="09:00">
+          <span>〜</span>
+          <input type="time" id="entry-edit-end" value="10:00">
         </div>
       </div>
       <div class="form-group">

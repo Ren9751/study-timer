@@ -703,8 +703,8 @@ body {
   gap: 8px;
 }
 
-.time-input-group input {
-  width: 64px;
+.time-input-group input[type="time"] {
+  flex: 1;
   padding: 12px;
   background: #222;
   border: 1px solid #333;
@@ -713,12 +713,10 @@ body {
   font-size: 16px;
   min-height: 44px;
   text-align: center;
-  -moz-appearance: textfield;
 }
 
-.time-input-group input::-webkit-inner-spin-button,
-.time-input-group input::-webkit-outer-spin-button {
-  -webkit-appearance: none;
+.time-input-group input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
 }
 
 .time-input-group input:focus {
