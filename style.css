@@ -312,6 +312,11 @@ body {
   color: #666;
 }
 
+.entry-paused {
+  font-size: 12px;
+  color: #c90;
+}
+
 .entry-memo {
   font-size: 13px;
   color: #888;

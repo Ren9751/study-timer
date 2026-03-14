@@ -431,7 +431,11 @@ StudyTimer.prototype.saveAndReset = function() {
     return;
   }
 
-  this.saveEntry(this.currentSubject, total, startStr, endStr, '');
+  // Calculate paused seconds: wall clock time minus actual study time
+  var wallClockSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
+  var pausedSeconds = Math.max(0, wallClockSeconds - total);
+
+  this.saveEntry(this.currentSubject, total, startStr, endStr, '', pausedSeconds);
   this.renderToday();
 };
 
@@ -545,19 +549,24 @@ StudyTimer.prototype.restoreTimer = function() {
 
 // === Entries (ログ) ===
 
-StudyTimer.prototype.saveEntry = function(subject, seconds, startTime, endTime, memo) {
+StudyTimer.prototype.saveEntry = function(subject, seconds, startTime, endTime, memo, pausedSeconds) {
   var today = DateUtils.today();
   var key = 'log-' + today;
   var log = Store.get(key) || { date: today, entries: [] };
 
-  log.entries.push({
+  var entry = {
     id: Date.now(),
     subject: subject,
     seconds: seconds,
     startTime: startTime || '',
     endTime: endTime || '',
     memo: memo || ''
-  });
+  };
+  if (pausedSeconds > 0) {
+    entry.pausedSeconds = pausedSeconds;
+  }
+
+  log.entries.push(entry);
 
   Store.set(key, log);
 };
@@ -674,23 +683,56 @@ StudyTimer.prototype.saveEntryFromModal = function() {
   var endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
   // Handle overnight (e.g. 23:00 - 01:00)
   if (endMin <= startMin) endMin += 24 * 60;
-  var seconds = (endMin - startMin) * 60;
+  var rangeSeconds = (endMin - startMin) * 60;
 
-  if (seconds < 60) {
+  if (rangeSeconds < 60) {
     alert('1分以上の時間を入力してください');
     return;
   }
 
   if (this.editingEntryId) {
-    this.updateEntry(this.editingEntryDate, this.editingEntryId, {
+    // Find the original entry to check if time range changed
+    var log = this.getLog(this.editingEntryDate);
+    var original = null;
+    if (log) {
+      for (var i = 0; i < log.entries.length; i++) {
+        if (log.entries[i].id === this.editingEntryId) {
+          original = log.entries[i];
+          break;
+        }
+      }
+    }
+
+    var seconds = rangeSeconds;
+    var pausedSeconds = 0;
+    if (original) {
+      var timeRangeChanged = original.startTime !== startTime || original.endTime !== endTime;
+      if (timeRangeChanged) {
+        // Time range changed by user: recalculate, no pause time
+        seconds = rangeSeconds;
+        pausedSeconds = 0;
+      } else {
+        // Time range unchanged: preserve original seconds and pausedSeconds
+        seconds = original.seconds;
+        pausedSeconds = original.pausedSeconds || 0;
+      }
+    }
+
+    var updates = {
       subject: subject,
       seconds: seconds,
       startTime: startTime,
       endTime: endTime,
       memo: memo
-    });
+    };
+    if (pausedSeconds > 0) {
+      updates.pausedSeconds = pausedSeconds;
+    } else {
+      updates.pausedSeconds = 0;
+    }
+    this.updateEntry(this.editingEntryDate, this.editingEntryId, updates);
   } else {
-    this.addManualEntry(this.editingEntryDate, subject, seconds, memo, startTime, endTime);
+    this.addManualEntry(this.editingEntryDate, subject, rangeSeconds, memo, startTime, endTime);
   }
 
   this.closeModal('modal-entry');
@@ -930,6 +972,15 @@ StudyTimer.prototype.createEntryItem = function(entry, dateStr, showEdit) {
 
   info.appendChild(top);
 
+  // Paused time display
+  var pausedSec = this.getEntryPausedSeconds(entry);
+  if (pausedSec > 0) {
+    var pauseEl = document.createElement('span');
+    pauseEl.className = 'entry-paused';
+    pauseEl.textContent = '⏸ ' + formatTimeShort(pausedSec);
+    top.appendChild(pauseEl);
+  }
+
   // Memo
   if (entry.memo) {
     var memoEl = document.createElement('div');
@@ -975,6 +1026,27 @@ StudyTimer.prototype.createEntryItem = function(entry, dateStr, showEdit) {
   item.appendChild(time);
   item.appendChild(actions);
   return item;
+};
+
+// === Paused seconds helper ===
+
+StudyTimer.prototype.getEntryPausedSeconds = function(entry) {
+  // If pausedSeconds is explicitly stored, use it
+  if (typeof entry.pausedSeconds === 'number') {
+    return entry.pausedSeconds;
+  }
+  // Backfill: calculate from time range vs actual seconds for past entries
+  if (entry.startTime && entry.endTime && entry.seconds) {
+    var startParts = entry.startTime.split(':');
+    var endParts = entry.endTime.split(':');
+    var startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+    var endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+    if (endMin <= startMin) endMin += 24 * 60;
+    var rangeSeconds = (endMin - startMin) * 60;
+    var paused = rangeSeconds - entry.seconds;
+    return paused > 60 ? paused : 0; // 1分未満の誤差は無視
+  }
+  return 0;
 };
 
 // === Calendar ===
