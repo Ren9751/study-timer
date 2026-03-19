@@ -65,61 +65,70 @@
       </div>
     </div>
 
-    <!-- 統計タブ（カレンダー + ログ + グラフ統合） -->
+    <!-- 統計タブ -->
     <div id="tab-stats" class="tab-content">
-      <div class="calendar" id="calendar">
-        <div class="calendar-header">
-          <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
-          <span id="cal-month"></span>
-          <button class="btn-icon" id="cal-next" aria-label="次月">›</button>
-        </div>
-        <div class="calendar-weekdays">
-          <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
-        </div>
-        <div class="calendar-days" id="cal-days"></div>
-      </div>
+      <nav class="sub-tabs">
+        <button class="sub-tab active" data-subtab="calendar">カレンダー</button>
+        <button class="sub-tab" data-subtab="charts">グラフ</button>
+      </nav>
 
-      <div class="day-detail" id="day-detail">
-        <div class="day-detail-header">
-          <div>
-            <h2 id="day-detail-date"></h2>
-            <div class="day-total" id="day-detail-total"></div>
+      <!-- カレンダーサブタブ -->
+      <div id="subtab-calendar" class="sub-tab-content active">
+        <div class="calendar" id="calendar">
+          <div class="calendar-header">
+            <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
+            <span id="cal-month"></span>
+            <button class="btn-icon" id="cal-next" aria-label="次月">›</button>
           </div>
-          <button class="btn-icon btn-add-entry" id="btn-add-entry" aria-label="記録を追加">＋</button>
+          <div class="calendar-weekdays">
+            <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
+          </div>
+          <div class="calendar-days" id="cal-days"></div>
         </div>
-        <div class="day-detail-donut hidden" id="day-detail-donut">
-          <canvas id="day-donut-chart" width="200" height="200"></canvas>
-          <div class="day-donut-legend" id="day-donut-legend"></div>
+
+        <div class="day-detail" id="day-detail">
+          <div class="day-detail-header">
+            <div>
+              <h2 id="day-detail-date"></h2>
+              <div class="day-total" id="day-detail-total"></div>
+            </div>
+            <button class="btn-icon btn-add-entry" id="btn-add-entry" aria-label="記録を追加">＋</button>
+          </div>
+          <div class="day-detail-donut hidden" id="day-detail-donut">
+            <canvas id="day-donut-chart" width="200" height="200"></canvas>
+            <div class="day-donut-legend" id="day-donut-legend"></div>
+          </div>
+          <div class="day-entries" id="day-detail-entries"></div>
         </div>
-        <div class="day-entries" id="day-detail-entries"></div>
       </div>
 
-      <hr class="section-divider">
+      <!-- グラフサブタブ -->
+      <div id="subtab-charts" class="sub-tab-content">
+        <div class="stats-period">
+          <button class="btn-period active" data-period="week">週</button>
+          <button class="btn-period" data-period="month">月</button>
+          <button class="btn-period" data-period="year">年</button>
+        </div>
 
-      <div class="stats-period">
-        <button class="btn-period active" data-period="week">週</button>
-        <button class="btn-period" data-period="month">月</button>
-        <button class="btn-period" data-period="year">年</button>
-      </div>
+        <div class="stats-nav">
+          <button class="btn-icon" id="stats-prev" aria-label="前の期間">‹</button>
+          <span class="stats-nav-label" id="stats-nav-label"></span>
+          <button class="btn-icon" id="stats-next" aria-label="次の期間">›</button>
+        </div>
 
-      <div class="stats-nav">
-        <button class="btn-icon" id="stats-prev" aria-label="前の期間">‹</button>
-        <span class="stats-nav-label" id="stats-nav-label"></span>
-        <button class="btn-icon" id="stats-next" aria-label="次の期間">›</button>
-      </div>
+        <div class="stats-total-card">
+          <div class="stats-total-label">合計勉強時間</div>
+          <div class="stats-total-time" id="stats-total-time">0:00:00</div>
+        </div>
 
-      <div class="stats-total-card">
-        <div class="stats-total-label">合計勉強時間</div>
-        <div class="stats-total-time" id="stats-total-time">0:00:00</div>
-      </div>
+        <div class="stats-chart-section">
+          <canvas id="stats-bar-chart"></canvas>
+        </div>
 
-      <div class="stats-chart-section">
-        <canvas id="stats-bar-chart"></canvas>
-      </div>
-
-      <div class="stats-donut-section">
-        <canvas id="stats-donut-chart" width="200" height="200"></canvas>
-        <div class="stats-donut-legend" id="stats-donut-legend"></div>
+        <div class="stats-donut-section">
+          <canvas id="stats-donut-chart" width="200" height="200"></canvas>
+          <div class="stats-donut-legend" id="stats-donut-legend"></div>
+        </div>
       </div>
     </div>
   </div>

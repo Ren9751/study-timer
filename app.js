@@ -103,6 +103,7 @@ function StudyTimer() {
   this.statsPeriod = 'week';
   this.statsOffset = 0;
   this.currentTab = 'timer';
+  this.currentSubTab = 'calendar';
 
   // Entry editing state
   this.editingEntryDate = null;
@@ -127,6 +128,13 @@ StudyTimer.prototype.bindEvents = function() {
   document.querySelectorAll('.tab').forEach(function(tab) {
     tab.addEventListener('click', function() {
       self.switchTab(this.dataset.tab);
+    });
+  });
+
+  // Sub tabs
+  document.querySelectorAll('.sub-tab').forEach(function(tab) {
+    tab.addEventListener('click', function() {
+      self.switchSubTab(this.dataset.subtab);
     });
   });
 
@@ -225,9 +233,7 @@ StudyTimer.prototype.bindEvents = function() {
     self.renderSubjectSelect();
     self.renderToday();
     if (self.currentTab === 'stats') {
-      self.renderCalendar();
-      self.renderDayDetail();
-      self.renderStats();
+      self.renderSubTab();
     }
     self.closeModal('modal-settings');
   });
@@ -356,8 +362,26 @@ StudyTimer.prototype.switchTab = function(tabName) {
   this.updateMiniTimerBar();
 
   if (tabName === 'stats') {
+    this.renderSubTab();
+  }
+};
+
+StudyTimer.prototype.switchSubTab = function(subTabName) {
+  this.currentSubTab = subTabName;
+
+  document.querySelectorAll('.sub-tab').forEach(function(t) { t.classList.remove('active'); });
+  document.querySelectorAll('.sub-tab-content').forEach(function(c) { c.classList.remove('active'); });
+  document.querySelector('.sub-tab[data-subtab="' + subTabName + '"]').classList.add('active');
+  document.getElementById('subtab-' + subTabName).classList.add('active');
+
+  this.renderSubTab();
+};
+
+StudyTimer.prototype.renderSubTab = function() {
+  if (this.currentSubTab === 'calendar') {
     this.renderCalendar();
     this.renderDayDetail();
+  } else {
     this.renderStats();
   }
 };
@@ -849,9 +873,7 @@ StudyTimer.prototype.saveEntryFromModal = function() {
   }
 
   this.closeModal('modal-entry');
-  this.renderDayDetail();
-  this.renderCalendar();
-  this.renderStats();
+  this.renderSubTab();
 
   // Also update today view if editing today
   if (this.editingEntryDate === DateUtils.today()) {
@@ -1127,9 +1149,7 @@ StudyTimer.prototype.createEntryItem = function(entry, dateStr, showEdit) {
       self.deleteEntry(dateStr, entry.id);
       self.renderToday();
       if (self.currentTab === 'stats') {
-        self.renderCalendar();
-        self.renderDayDetail();
-        self.renderStats();
+        self.renderSubTab();
       }
     }
   });
@@ -1576,9 +1596,7 @@ StudyTimer.prototype.importData = function(event) {
       self.renderSubjectSelect();
       self.renderToday();
       if (self.currentTab === 'stats') {
-        self.renderCalendar();
-        self.renderDayDetail();
-        self.renderStats();
+        self.renderSubTab();
       }
       self.closeModal('modal-settings');
       alert('インポート完了');

@@ -88,6 +88,41 @@ body {
   display: block;
 }
 
+/* === Sub Tabs === */
+.sub-tabs {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+
+.sub-tab {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #111;
+  color: #888;
+  font-size: 14px;
+  cursor: pointer;
+  min-height: 40px;
+  transition: color 0.2s, background 0.2s;
+}
+
+.sub-tab.active {
+  background: #1a3a2a;
+  border-color: #4a9;
+  color: #4a9;
+  font-weight: 600;
+}
+
+.sub-tab-content {
+  display: none;
+}
+
+.sub-tab-content.active {
+  display: block;
+}
+
 /* === Timer === */
 .timer-display {
   text-align: center;
@@ -518,12 +553,7 @@ body {
   padding: 16px 0;
 }
 
-/* === Section Divider === */
-.section-divider {
-  border: none;
-  border-top: 1px solid #222;
-  margin: 20px 0;
-}
+
 
 /* === Stats === */
 .stats-period {

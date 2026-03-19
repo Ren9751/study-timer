@@ -1,4 +1,4 @@
-var CACHE_NAME = 'study-timer-v2';
+var CACHE_NAME = 'study-timer-v3';
 var URLS_TO_CACHE = [
   './',
   'index.html',
