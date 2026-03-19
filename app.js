@@ -94,6 +94,7 @@ function StudyTimer() {
   this.timerInterval = null;
   this.timerRealStart = null; // 実際の開始時刻(Date.now())
   this.timerPauseStart = null; // 一時停止開始時刻
+  this.breakAccumulated = 0; // 累計休憩秒数
   this.breakInterval = null;
   this.currentSubject = '';
   this.calendarYear = new Date().getFullYear();
@@ -395,12 +396,15 @@ StudyTimer.prototype.startTimer = function() {
     this.timerRealStart = now;
   }
 
-  // Clear break interval and pause start on resume
+  // Accumulate break time on resume and clear pause state
+  if (this.timerPauseStart) {
+    this.breakAccumulated += Math.floor((now - this.timerPauseStart) / 1000);
+    this.timerPauseStart = null;
+  }
   if (this.breakInterval) {
     clearInterval(this.breakInterval);
     this.breakInterval = null;
   }
-  this.timerPauseStart = null;
 
   var self = this;
   this.timerInterval = setInterval(function() {
@@ -446,6 +450,12 @@ StudyTimer.prototype.saveAndReset = function() {
   var startStr = String(startTime.getHours()).padStart(2, '0') + ':' + String(startTime.getMinutes()).padStart(2, '0');
   var endStr = String(endTime.getHours()).padStart(2, '0') + ':' + String(endTime.getMinutes()).padStart(2, '0');
 
+  // Calculate paused seconds from accumulated break time
+  var pausedSeconds = this.breakAccumulated;
+  if (this.timerPauseStart) {
+    pausedSeconds += Math.floor((Date.now() - this.timerPauseStart) / 1000);
+  }
+
   clearInterval(this.timerInterval);
   this.timerInterval = null;
   if (this.breakInterval) {
@@ -458,6 +468,7 @@ StudyTimer.prototype.saveAndReset = function() {
   this.timerAccumulated = 0;
   this.timerRealStart = null;
   this.timerPauseStart = null;
+  this.breakAccumulated = 0;
 
   this.clearTimerState();
   this.updateTimerUI();
@@ -467,10 +478,6 @@ StudyTimer.prototype.saveAndReset = function() {
     alert('1分以上勉強してから保存してね');
     return;
   }
-
-  // Calculate paused seconds: wall clock time minus actual study time
-  var wallClockSeconds = Math.floor((endTime.getTime() - startTime.getTime()) / 1000);
-  var pausedSeconds = Math.max(0, wallClockSeconds - total);
 
   this.saveEntry(this.currentSubject, total, startStr, endStr, '', pausedSeconds);
   this.renderToday();
@@ -489,6 +496,7 @@ StudyTimer.prototype.resetTimer = function() {
   this.timerAccumulated = 0;
   this.timerRealStart = null;
   this.timerPauseStart = null;
+  this.breakAccumulated = 0;
   this.clearTimerState();
   this.updateTimerUI();
   this.updateMiniTimerBar();
@@ -527,28 +535,17 @@ StudyTimer.prototype.updateBreakDisplay = function() {
   var breakEl = document.getElementById('timer-break');
   var breakTimeEl = document.getElementById('timer-break-time');
 
-  if (!this.timerRealStart) {
-    breakEl.classList.add('hidden');
-    return;
-  }
+  var currentPause = this.timerPauseStart ? Math.floor((Date.now() - this.timerPauseStart) / 1000) : 0;
+  var totalBreak = this.breakAccumulated + currentPause;
 
-  var now = Date.now();
-  var wallClock = Math.floor((now - this.timerRealStart) / 1000);
-  var studyTime = this.timerAccumulated;
-  if (this.timerRunning && this.timerStart) {
-    studyTime += Math.floor((now - this.timerStart) / 1000);
-  }
-  var totalBreak = Math.max(0, wallClock - studyTime);
-  var currentPause = this.timerPauseStart ? Math.floor((now - this.timerPauseStart) / 1000) : 0;
-
-  if (totalBreak <= 0 && currentPause <= 0) {
+  if (totalBreak <= 0) {
     breakEl.classList.add('hidden');
     return;
   }
 
   breakEl.classList.remove('hidden');
   var text = '休憩 ' + formatTimeShort(totalBreak);
-  if (currentPause > 0) {
+  if (currentPause > 0 && this.breakAccumulated > 0) {
     text += ' (+' + formatTimeShort(currentPause) + ')';
   }
   breakTimeEl.textContent = text;
@@ -610,7 +607,8 @@ StudyTimer.prototype.saveTimerState = function() {
       accumulated: this.timerAccumulated,
       paused: this.timerPaused,
       realStartTime: this.timerRealStart,
-      pauseStart: this.timerPauseStart
+      pauseStart: this.timerPauseStart,
+      breakAccumulated: this.breakAccumulated
     });
   }
 };
@@ -626,6 +624,7 @@ StudyTimer.prototype.restoreTimer = function() {
   this.currentSubject = state.subject;
   this.timerAccumulated = state.accumulated || 0;
   this.timerRealStart = state.realStartTime || null;
+  this.breakAccumulated = state.breakAccumulated || 0;
 
   var select = document.getElementById('subject-select');
   select.value = this.currentSubject;
