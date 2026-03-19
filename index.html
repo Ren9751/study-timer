@@ -29,6 +29,9 @@
     <div id="tab-timer" class="tab-content active">
       <div class="timer-display">
         <div class="timer-time" id="timer-time">00:00:00</div>
+        <div class="timer-break hidden" id="timer-break">
+          <span id="timer-break-time"></span>
+        </div>
         <div class="timer-subject" id="timer-subject-label"></div>
       </div>
 
@@ -46,6 +49,13 @@
           <span class="btn-save-progress"></span>
         </button>
         <button class="btn btn-large hidden" id="btn-reset">リセット</button>
+      </div>
+
+      <div class="timer-adjust hidden" id="timer-adjust">
+        <button class="btn btn-adjust" id="btn-adjust-minus5">-5分</button>
+        <button class="btn btn-adjust" id="btn-adjust-minus1">-1分</button>
+        <button class="btn btn-adjust" id="btn-adjust-plus1">+1分</button>
+        <button class="btn btn-adjust" id="btn-adjust-plus5">+5分</button>
       </div>
 
       <div class="today-summary">
@@ -76,6 +86,10 @@
             <div class="day-total" id="day-detail-total"></div>
           </div>
           <button class="btn-icon btn-add-entry" id="btn-add-entry" aria-label="記録を追加">＋</button>
+        </div>
+        <div class="day-detail-donut hidden" id="day-detail-donut">
+          <canvas id="day-donut-chart" width="200" height="200"></canvas>
+          <div class="day-donut-legend" id="day-donut-legend"></div>
         </div>
         <div class="day-entries" id="day-detail-entries"></div>
       </div>

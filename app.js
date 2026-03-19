@@ -93,6 +93,8 @@ function StudyTimer() {
   this.timerAccumulated = 0;
   this.timerInterval = null;
   this.timerRealStart = null; // 実際の開始時刻(Date.now())
+  this.timerPauseStart = null; // 一時停止開始時刻
+  this.breakInterval = null;
   this.currentSubject = '';
   this.calendarYear = new Date().getFullYear();
   this.calendarMonth = new Date().getMonth();
@@ -300,6 +302,20 @@ StudyTimer.prototype.bindEvents = function() {
     self.closeModal('modal-entry');
   });
 
+  // Time adjust buttons
+  document.getElementById('btn-adjust-minus5').addEventListener('click', function() {
+    self.adjustTime(-300);
+  });
+  document.getElementById('btn-adjust-minus1').addEventListener('click', function() {
+    self.adjustTime(-60);
+  });
+  document.getElementById('btn-adjust-plus1').addEventListener('click', function() {
+    self.adjustTime(60);
+  });
+  document.getElementById('btn-adjust-plus5').addEventListener('click', function() {
+    self.adjustTime(300);
+  });
+
   // Mini timer bar click -> switch to timer tab
   document.getElementById('mini-timer-bar').addEventListener('click', function() {
     self.switchTab('timer');
@@ -369,19 +385,27 @@ StudyTimer.prototype.updateMiniTimerBar = function() {
 
 StudyTimer.prototype.startTimer = function() {
   if (!this.currentSubject) return;
+  var now = Date.now();
   this.timerRunning = true;
   this.timerPaused = false;
-  this.timerStart = Date.now();
+  this.timerStart = now;
 
   // Track real start time (only on first start, not resume)
   if (!this.timerRealStart) {
-    this.timerRealStart = Date.now();
+    this.timerRealStart = now;
   }
+
+  // Clear break interval and pause start on resume
+  if (this.breakInterval) {
+    clearInterval(this.breakInterval);
+    this.breakInterval = null;
+  }
+  this.timerPauseStart = null;
 
   var self = this;
   this.timerInterval = setInterval(function() {
     self.updateTimerDisplay();
-    self.updateMiniTimerBar();
+    if (self.currentTab !== 'timer') self.updateMiniTimerBar();
   }, 1000);
 
   this.updateTimerUI();
@@ -396,8 +420,16 @@ StudyTimer.prototype.pauseTimer = function() {
   this.timerRunning = false;
   this.timerPaused = true;
   this.timerStart = null;
+  this.timerPauseStart = Date.now();
+
+  // Start break display update interval
+  var self = this;
+  this.breakInterval = setInterval(function() {
+    self.updateBreakDisplay();
+  }, 1000);
 
   this.updateTimerUI();
+  this.updateBreakDisplay();
   this.updateMiniTimerBar();
   this.saveTimerState();
 };
@@ -416,11 +448,16 @@ StudyTimer.prototype.saveAndReset = function() {
 
   clearInterval(this.timerInterval);
   this.timerInterval = null;
+  if (this.breakInterval) {
+    clearInterval(this.breakInterval);
+    this.breakInterval = null;
+  }
   this.timerRunning = false;
   this.timerPaused = false;
   this.timerStart = null;
   this.timerAccumulated = 0;
   this.timerRealStart = null;
+  this.timerPauseStart = null;
 
   this.clearTimerState();
   this.updateTimerUI();
@@ -442,11 +479,16 @@ StudyTimer.prototype.saveAndReset = function() {
 StudyTimer.prototype.resetTimer = function() {
   clearInterval(this.timerInterval);
   this.timerInterval = null;
+  if (this.breakInterval) {
+    clearInterval(this.breakInterval);
+    this.breakInterval = null;
+  }
   this.timerRunning = false;
   this.timerPaused = false;
   this.timerStart = null;
   this.timerAccumulated = 0;
   this.timerRealStart = null;
+  this.timerPauseStart = null;
   this.clearTimerState();
   this.updateTimerUI();
   this.updateMiniTimerBar();
@@ -455,6 +497,61 @@ StudyTimer.prototype.resetTimer = function() {
 StudyTimer.prototype.updateTimerDisplay = function() {
   var elapsed = this.timerAccumulated + Math.floor((Date.now() - this.timerStart) / 1000);
   document.getElementById('timer-time').textContent = formatTime(elapsed);
+
+  // Update break display during running state
+  this.updateBreakDisplay();
+};
+
+StudyTimer.prototype.adjustTime = function(deltaSeconds) {
+  if (!this.timerRunning && !this.timerPaused) return;
+
+  if (this.timerRunning) {
+    // Calculate current effective study time
+    var currentElapsed = this.timerAccumulated + Math.floor((Date.now() - this.timerStart) / 1000);
+    var newElapsed = Math.max(0, currentElapsed + deltaSeconds);
+    // Reset timerStart to now and store newElapsed as accumulated
+    this.timerAccumulated = newElapsed;
+    this.timerStart = Date.now();
+    this.updateTimerDisplay();
+  } else {
+    // Paused: adjust accumulated directly
+    this.timerAccumulated = Math.max(0, this.timerAccumulated + deltaSeconds);
+  }
+
+  this.updateTimerUI();
+  this.updateMiniTimerBar();
+  this.saveTimerState();
+};
+
+StudyTimer.prototype.updateBreakDisplay = function() {
+  var breakEl = document.getElementById('timer-break');
+  var breakTimeEl = document.getElementById('timer-break-time');
+
+  if (!this.timerRealStart) {
+    breakEl.classList.add('hidden');
+    return;
+  }
+
+  var now = Date.now();
+  var wallClock = Math.floor((now - this.timerRealStart) / 1000);
+  var studyTime = this.timerAccumulated;
+  if (this.timerRunning && this.timerStart) {
+    studyTime += Math.floor((now - this.timerStart) / 1000);
+  }
+  var totalBreak = Math.max(0, wallClock - studyTime);
+  var currentPause = this.timerPauseStart ? Math.floor((now - this.timerPauseStart) / 1000) : 0;
+
+  if (totalBreak <= 0 && currentPause <= 0) {
+    breakEl.classList.add('hidden');
+    return;
+  }
+
+  breakEl.classList.remove('hidden');
+  var text = '休憩 ' + formatTimeShort(totalBreak);
+  if (currentPause > 0) {
+    text += ' (+' + formatTimeShort(currentPause) + ')';
+  }
+  breakTimeEl.textContent = text;
 };
 
 StudyTimer.prototype.updateTimerUI = function() {
@@ -464,6 +561,7 @@ StudyTimer.prototype.updateTimerUI = function() {
   var display = document.getElementById('timer-time');
   var subjectLabel = document.getElementById('timer-subject-label');
   var select = document.getElementById('subject-select');
+  var adjustEl = document.getElementById('timer-adjust');
 
   btn.classList.remove('btn-primary', 'btn-pause', 'btn-stop');
 
@@ -473,6 +571,7 @@ StudyTimer.prototype.updateTimerUI = function() {
     btn.disabled = false;
     btnSave.classList.remove('hidden');
     btnReset.classList.remove('hidden');
+    adjustEl.classList.remove('hidden');
     display.classList.add('running');
     subjectLabel.textContent = this.currentSubject;
     select.disabled = true;
@@ -482,6 +581,7 @@ StudyTimer.prototype.updateTimerUI = function() {
     btn.disabled = false;
     btnSave.classList.remove('hidden');
     btnReset.classList.remove('hidden');
+    adjustEl.classList.remove('hidden');
     display.textContent = formatTime(this.timerAccumulated);
     display.classList.add('running');
     subjectLabel.textContent = this.currentSubject;
@@ -492,10 +592,12 @@ StudyTimer.prototype.updateTimerUI = function() {
     btn.disabled = !this.currentSubject;
     btnSave.classList.add('hidden');
     btnReset.classList.add('hidden');
+    adjustEl.classList.add('hidden');
     display.textContent = '00:00:00';
     display.classList.remove('running');
     subjectLabel.textContent = '';
     select.disabled = false;
+    document.getElementById('timer-break').classList.add('hidden');
   }
 };
 
@@ -507,7 +609,8 @@ StudyTimer.prototype.saveTimerState = function() {
       startTime: this.timerStart,
       accumulated: this.timerAccumulated,
       paused: this.timerPaused,
-      realStartTime: this.timerRealStart
+      realStartTime: this.timerRealStart,
+      pauseStart: this.timerPauseStart
     });
   }
 };
@@ -527,18 +630,30 @@ StudyTimer.prototype.restoreTimer = function() {
   var select = document.getElementById('subject-select');
   select.value = this.currentSubject;
 
+  // Defensively clear any pre-existing intervals
+  if (this.timerInterval) { clearInterval(this.timerInterval); this.timerInterval = null; }
+  if (this.breakInterval) { clearInterval(this.breakInterval); this.breakInterval = null; }
+
+  var self = this;
+
   if (state.paused) {
     this.timerPaused = true;
     this.timerRunning = false;
     this.timerStart = null;
+    this.timerPauseStart = state.pauseStart || null;
+
+    // Start break display update interval
+    this.breakInterval = setInterval(function() {
+      self.updateBreakDisplay();
+    }, 1000);
+    this.updateBreakDisplay();
   } else {
     this.timerStart = state.startTime;
     this.timerRunning = true;
 
-    var self = this;
     this.timerInterval = setInterval(function() {
       self.updateTimerDisplay();
-      self.updateMiniTimerBar();
+      if (self.currentTab !== 'timer') self.updateMiniTimerBar();
     }, 1000);
 
     this.updateTimerDisplay();
@@ -668,6 +783,9 @@ StudyTimer.prototype.saveEntryFromModal = function() {
   var subject = document.getElementById('entry-edit-subject').value;
   var startTime = document.getElementById('entry-edit-start').value;
   var endTime = document.getElementById('entry-edit-end').value;
+  // Normalize to HH:MM (some browsers return HH:MM:SS)
+  if (startTime.length > 5) startTime = startTime.substring(0, 5);
+  if (endTime.length > 5) endTime = endTime.substring(0, 5);
   var memo = document.getElementById('entry-edit-memo').value.trim();
 
   if (!subject) return;
@@ -707,14 +825,10 @@ StudyTimer.prototype.saveEntryFromModal = function() {
     var pausedSeconds = 0;
     if (original) {
       var timeRangeChanged = original.startTime !== startTime || original.endTime !== endTime;
-      if (timeRangeChanged) {
-        // Time range changed by user: recalculate, no pause time
-        seconds = rangeSeconds;
-        pausedSeconds = 0;
-      } else {
+      if (!timeRangeChanged) {
         // Time range unchanged: preserve original seconds and pausedSeconds
         seconds = original.seconds;
-        pausedSeconds = original.pausedSeconds || 0;
+        pausedSeconds = this.getEntryPausedSeconds(original);
       }
     }
 
@@ -1116,10 +1230,12 @@ StudyTimer.prototype.renderDayDetail = function() {
   document.getElementById('day-detail-total').textContent = formatTimeShort(total);
 
   var container = document.getElementById('day-detail-entries');
+  var donutContainer = document.getElementById('day-detail-donut');
   var self = this;
 
   if (entries.length === 0) {
     container.innerHTML = '<p class="no-entries">記録なし</p>';
+    if (donutContainer) donutContainer.classList.add('hidden');
     return;
   }
 
@@ -1127,6 +1243,21 @@ StudyTimer.prototype.renderDayDetail = function() {
   entries.forEach(function(entry) {
     container.appendChild(self.createEntryItem(entry, dateStr, true));
   });
+
+  // Draw day donut chart
+  if (donutContainer) {
+    donutContainer.classList.remove('hidden');
+    var subjectTotals = {};
+    entries.forEach(function(e) {
+      if (e.subject && typeof e.seconds === 'number') {
+        subjectTotals[e.subject] = (subjectTotals[e.subject] || 0) + e.seconds;
+      }
+    });
+    var subjectEntries = Object.keys(subjectTotals).map(function(s) {
+      return { name: s, seconds: subjectTotals[s] };
+    }).sort(function(a, b) { return b.seconds - a.seconds; });
+    this.drawDonutChart(subjectEntries, total, 'day-donut-chart', 'day-donut-legend');
+  }
 };
 
 // === Stats ===
@@ -1169,7 +1300,7 @@ StudyTimer.prototype.renderStats = function() {
 
   var labels = barData.map(function(b) { return b.label; });
   var values = barData.map(function(b) { return b.seconds / 3600; });
-  this.drawBarChart(labels, values);
+  this.drawBarChart(labels, values, period);
 
   var subjectEntries = Object.keys(subjectTotals).map(function(s) {
     return { name: s, seconds: subjectTotals[s] };
@@ -1233,7 +1364,7 @@ StudyTimer.prototype.getStatsRange = function(period, offset, today) {
   return result;
 };
 
-StudyTimer.prototype.drawBarChart = function(labels, values) {
+StudyTimer.prototype.drawBarChart = function(labels, values, period) {
   var canvas = document.getElementById('stats-bar-chart');
   var dpr = window.devicePixelRatio || 1;
   var rect = canvas.getBoundingClientRect();
@@ -1251,6 +1382,21 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
   var chartW = W - padLeft - padRight;
   var chartH = H - padTop - padBottom;
   var maxVal = 12;
+  var ySteps = [0, 3, 6, 9, 12];
+
+  if (period === 'year') {
+    var dataMax = Math.max.apply(null, values.concat([0]));
+    if (dataMax <= 50) {
+      maxVal = 50;
+      ySteps = [0, 10, 20, 30, 40, 50];
+    } else if (dataMax <= 100) {
+      maxVal = 100;
+      ySteps = [0, 25, 50, 75, 100];
+    } else {
+      maxVal = 200;
+      ySteps = [0, 50, 100, 150, 200];
+    }
+  }
 
   ctx.clearRect(0, 0, W, H);
 
@@ -1260,8 +1406,6 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
   ctx.font = '11px -apple-system, sans-serif';
   ctx.textAlign = 'right';
   ctx.textBaseline = 'middle';
-
-  var ySteps = [0, 3, 6, 9, 12];
   ySteps.forEach(function(v) {
     var y = padTop + chartH - (v / maxVal) * chartH;
     ctx.beginPath();
@@ -1307,8 +1451,10 @@ StudyTimer.prototype.drawBarChart = function(labels, values) {
   }
 };
 
-StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal) {
-  var canvas = document.getElementById('stats-donut-chart');
+StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal, canvasId, legendId) {
+  canvasId = canvasId || 'stats-donut-chart';
+  legendId = legendId || 'stats-donut-legend';
+  var canvas = document.getElementById(canvasId);
   var dpr = window.devicePixelRatio || 1;
   canvas.width = 140 * dpr;
   canvas.height = 140 * dpr;
@@ -1327,7 +1473,7 @@ StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal) {
     ctx.fillStyle = '#222';
     ctx.fill();
 
-    document.getElementById('stats-donut-legend').innerHTML =
+    document.getElementById(legendId).innerHTML =
       '<p class="no-entries" style="font-size:13px">データなし</p>';
     return;
   }
@@ -1348,7 +1494,7 @@ StudyTimer.prototype.drawDonutChart = function(subjectEntries, grandTotal) {
     startAngle = endAngle;
   });
 
-  var legend = document.getElementById('stats-donut-legend');
+  var legend = document.getElementById(legendId);
   legend.innerHTML = '';
   subjectEntries.forEach(function(entry, idx) {
     var item = document.createElement('div');

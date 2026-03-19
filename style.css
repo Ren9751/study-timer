@@ -106,6 +106,13 @@ body {
   color: #4a9;
 }
 
+.timer-break {
+  font-size: 14px;
+  color: #c90;
+  margin-top: 8px;
+  font-variant-numeric: tabular-nums;
+}
+
 .timer-subject-label {
   margin-top: 8px;
   font-size: 14px;
@@ -137,7 +144,24 @@ body {
 .timer-controls {
   display: flex;
   gap: 12px;
+  margin-bottom: 12px;
+}
+
+.timer-adjust {
+  display: flex;
+  gap: 8px;
   margin-bottom: 32px;
+  justify-content: center;
+}
+
+.btn-adjust {
+  padding: 8px 12px;
+  font-size: 13px;
+  min-height: 36px;
+  border-radius: 6px;
+  color: #aaa;
+  background: #111;
+  border: 1px solid #333;
 }
 
 /* === Buttons === */
@@ -459,6 +483,27 @@ body {
   background: #1a3a2a;
   border-color: #4a9;
   color: #4a9;
+}
+
+.day-detail-donut {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.day-detail-donut canvas {
+  flex-shrink: 0;
+  width: 140px;
+  height: 140px;
+}
+
+.day-donut-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
 }
 
 .day-entries {
