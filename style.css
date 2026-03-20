@@ -861,3 +861,25 @@ body {
   margin-left: 8px;
   font-size: 16px;
 }
+
+.log-list-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 8px;
+}
+
+.log-list-add input[type="date"] {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid #333;
+  border-radius: 8px;
+  background: #1a1a1a;
+  color: #fff;
+  font-size: 14px;
+}
+
+.log-list-add .btn {
+  white-space: nowrap;
+  font-size: 13px;
+}

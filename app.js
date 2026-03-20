@@ -270,6 +270,17 @@ StudyTimer.prototype.bindEvents = function() {
     self.renderCalendar();
   });
 
+  // Add entry by date picker
+  document.getElementById('btn-add-entry-date').addEventListener('click', function() {
+    var dateInput = document.getElementById('log-list-date');
+    var dateStr = dateInput.value;
+    if (!dateStr) {
+      alert('日付を選んでください');
+      return;
+    }
+    self.openEntryModal(dateStr, null);
+  });
+
   // Stats period buttons
   document.querySelectorAll('.btn-period').forEach(function(btn) {
     btn.addEventListener('click', function() {
