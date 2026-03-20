@@ -537,19 +537,12 @@ StudyTimer.prototype.updateTimerDisplay = function() {
 StudyTimer.prototype.adjustTime = function(deltaSeconds) {
   if (!this.timerRunning && !this.timerPaused) return;
 
-  if (this.timerRunning) {
-    // Calculate current effective study time
-    var currentElapsed = this.timerAccumulated + Math.floor((Date.now() - this.timerStart) / 1000);
-    var newElapsed = Math.max(0, currentElapsed + deltaSeconds);
-    // Reset timerStart to now and store newElapsed as accumulated
-    this.timerAccumulated = newElapsed;
-    this.timerStart = Date.now();
-    this.updateTimerDisplay();
-  } else {
-    // Paused: adjust accumulated directly
-    this.timerAccumulated = Math.max(0, this.timerAccumulated + deltaSeconds);
-  }
+  // Adjust break time directly
+  // +5分 → break increases by 5 min, -5分 → break decreases by 5 min
+  this.breakAccumulated = Math.max(0, this.breakAccumulated + deltaSeconds);
 
+  this.updateTimerDisplay();
+  this.updateBreakDisplay();
   this.updateTimerUI();
   this.updateMiniTimerBar();
   this.saveTimerState();
