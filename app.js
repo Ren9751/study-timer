@@ -832,7 +832,7 @@ StudyTimer.prototype.saveEntryFromModal = function() {
   }
 
   if (this.editingEntryId) {
-    // Find the original entry to check if time range changed
+    // Find the original entry to preserve pausedSeconds
     var log = this.getLog(this.editingEntryDate);
     var original = null;
     if (log) {
@@ -844,29 +844,19 @@ StudyTimer.prototype.saveEntryFromModal = function() {
       }
     }
 
-    var seconds = rangeSeconds;
-    var pausedSeconds = 0;
-    if (original) {
-      var timeRangeChanged = original.startTime !== startTime || original.endTime !== endTime;
-      if (!timeRangeChanged) {
-        // Time range unchanged: preserve original seconds and pausedSeconds
-        seconds = original.seconds;
-        pausedSeconds = this.getEntryPausedSeconds(original);
-      }
-    }
+    // Preserve original pausedSeconds, recalculate seconds
+    var pausedSeconds = original ? this.getEntryPausedSeconds(original) : 0;
+    if (pausedSeconds > rangeSeconds) pausedSeconds = 0;
+    var seconds = rangeSeconds - pausedSeconds;
 
     var updates = {
       subject: subject,
       seconds: seconds,
       startTime: startTime,
       endTime: endTime,
-      memo: memo
+      memo: memo,
+      pausedSeconds: pausedSeconds
     };
-    if (pausedSeconds > 0) {
-      updates.pausedSeconds = pausedSeconds;
-    } else {
-      updates.pausedSeconds = 0;
-    }
     this.updateEntry(this.editingEntryDate, this.editingEntryId, updates);
   } else {
     this.addManualEntry(this.editingEntryDate, subject, rangeSeconds, memo, startTime, endTime);
