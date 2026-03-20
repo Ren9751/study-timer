@@ -561,10 +561,27 @@ StudyTimer.prototype.updateBreakDisplay = function() {
   }
 
   breakEl.classList.remove('hidden');
+
+  // Calculate total elapsed time (work + break)
+  var workTime = this.timerAccumulated;
+  if (this.timerRunning && this.timerStart) {
+    workTime += Math.floor((Date.now() - this.timerStart) / 1000);
+  }
+  var totalElapsed = workTime + totalBreak;
+
   var text = '休憩 ' + formatTimeShort(totalBreak);
   if (currentPause > 0 && this.breakAccumulated > 0) {
     text += ' (+' + formatTimeShort(currentPause) + ')';
   }
+
+  // Show break ratio indicator (1/6 = pomodoro threshold)
+  if (totalElapsed > 0) {
+    var ratio = totalBreak / totalElapsed;
+    if (ratio > 1 / 6) {
+      text += ' ⚠';
+    }
+  }
+
   breakTimeEl.textContent = text;
 };
 
@@ -1095,7 +1112,20 @@ StudyTimer.prototype.createEntryItem = function(entry, dateStr, showEdit) {
   if (pausedSec > 0) {
     var pauseEl = document.createElement('span');
     pauseEl.className = 'entry-paused';
-    pauseEl.textContent = '⏸ ' + formatTimeShort(pausedSec);
+    var pauseText = '⏸ ' + formatTimeShort(pausedSec);
+    // Show warning if break ratio exceeds 1/6
+    if (entry.startTime && entry.endTime) {
+      var startParts = entry.startTime.split(':');
+      var endParts = entry.endTime.split(':');
+      var startMin = parseInt(startParts[0]) * 60 + parseInt(startParts[1]);
+      var endMin = parseInt(endParts[0]) * 60 + parseInt(endParts[1]);
+      if (endMin <= startMin) endMin += 24 * 60;
+      var rangeSeconds = (endMin - startMin) * 60;
+      if (rangeSeconds > 0 && pausedSec / rangeSeconds > 1 / 6) {
+        pauseText += ' ⚠';
+      }
+    }
+    pauseEl.textContent = pauseText;
     top.appendChild(pauseEl);
   }
 
