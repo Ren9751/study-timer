@@ -295,11 +295,6 @@ StudyTimer.prototype.bindEvents = function() {
     }
   });
 
-  // Add entry button
-  document.getElementById('btn-add-entry').addEventListener('click', function() {
-    self.openEntryModal(self.selectedDate, null);
-  });
-
   // Entry modal save/cancel
   document.getElementById('btn-save-entry').addEventListener('click', function() {
     self.saveEntryFromModal();
@@ -380,7 +375,6 @@ StudyTimer.prototype.switchSubTab = function(subTabName) {
 StudyTimer.prototype.renderSubTab = function() {
   if (this.currentSubTab === 'calendar') {
     this.renderCalendar();
-    this.renderDayDetail();
   } else {
     this.renderStats();
   }
@@ -1203,93 +1197,50 @@ StudyTimer.prototype.renderCalendar = function() {
 
   document.getElementById('cal-month').textContent = year + '年' + (month + 1) + '月';
 
-  var firstDay = new Date(year, month, 1);
   var lastDay = new Date(year, month + 1, 0);
-  var startWeekday = firstDay.getDay();
-  startWeekday = startWeekday === 0 ? 6 : startWeekday - 1;
-
-  var container = document.getElementById('cal-days');
-  container.innerHTML = '';
+  var container = document.getElementById('log-list');
   var self = this;
 
-  for (var i = 0; i < startWeekday; i++) {
-    var empty = document.createElement('div');
-    empty.className = 'cal-day empty';
-    container.appendChild(empty);
+  container.innerHTML = '';
+
+  // Iterate days in reverse (newest first)
+  for (var d = lastDay.getDate(); d >= 1; d--) {
+    var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
+    var log = this.getLog(dateStr);
+    if (!log || log.entries.length === 0) continue;
+
+    var total = log.entries.reduce(function(sum, e) { return sum + (e.seconds || 0); }, 0);
+
+    // Day header
+    var dayHeader = document.createElement('div');
+    dayHeader.className = 'log-list-day-header';
+    var dayDate = new Date(year, month, d);
+    var weekday = ['日', '月', '火', '水', '木', '金', '土'][dayDate.getDay()];
+    dayHeader.innerHTML = '<span class="log-list-date">' + (month + 1) + '/' + d + '（' + weekday + '）</span>' +
+      '<span class="log-list-total">' + formatTimeShort(total) + '</span>' +
+      '<button class="btn-icon btn-add-entry-list" aria-label="記録を追加">＋</button>';
+    container.appendChild(dayHeader);
+
+    // Add entry button handler
+    dayHeader.querySelector('.btn-add-entry-list').addEventListener('click', (function(ds) {
+      return function() { self.openEntryModal(ds, null); };
+    })(dateStr));
+
+    // Entries
+    log.entries.forEach(function(entry) {
+      container.appendChild(self.createEntryItem(entry, dateStr, true));
+    });
   }
 
-  var today = DateUtils.today();
-
-  for (var d = 1; d <= lastDay.getDate(); d++) {
-    var dateStr = year + '-' + String(month + 1).padStart(2, '0') + '-' + String(d).padStart(2, '0');
-    var cell = document.createElement('div');
-    cell.className = 'cal-day';
-    cell.textContent = d;
-
-    if (dateStr === today) cell.classList.add('today');
-    if (dateStr === this.selectedDate) cell.classList.add('selected');
-
-    var total = this.getDayTotal(dateStr);
-    if (total > 0) {
-      var hours = total / 3600;
-      if (hours >= 4) cell.classList.add('has-log--4');
-      else if (hours >= 2) cell.classList.add('has-log--3');
-      else if (hours >= 1) cell.classList.add('has-log--2');
-      else cell.classList.add('has-log--1');
-    }
-
-    cell.dataset.date = dateStr;
-    cell.addEventListener('click', function() {
-      self.selectedDate = this.dataset.date;
-      self.renderCalendar();
-      self.renderDayDetail();
-    });
-
-    container.appendChild(cell);
+  if (container.children.length === 0) {
+    container.innerHTML = '<p class="no-entries">この月の記録はありません</p>';
   }
 };
 
 // === Day Detail ===
 
 StudyTimer.prototype.renderDayDetail = function() {
-  var dateStr = this.selectedDate;
-  document.getElementById('day-detail-date').textContent = DateUtils.formatDisplay(dateStr);
-
-  var log = this.getLog(dateStr);
-  var entries = log ? log.entries : [];
-  var total = entries.reduce(function(sum, e) { return sum + e.seconds; }, 0);
-
-  document.getElementById('day-detail-total').textContent = formatTimeShort(total);
-
-  var container = document.getElementById('day-detail-entries');
-  var donutContainer = document.getElementById('day-detail-donut');
-  var self = this;
-
-  if (entries.length === 0) {
-    container.innerHTML = '<p class="no-entries">記録なし</p>';
-    if (donutContainer) donutContainer.classList.add('hidden');
-    return;
-  }
-
-  container.innerHTML = '';
-  entries.forEach(function(entry) {
-    container.appendChild(self.createEntryItem(entry, dateStr, true));
-  });
-
-  // Draw day donut chart
-  if (donutContainer) {
-    donutContainer.classList.remove('hidden');
-    var subjectTotals = {};
-    entries.forEach(function(e) {
-      if (e.subject && typeof e.seconds === 'number') {
-        subjectTotals[e.subject] = (subjectTotals[e.subject] || 0) + e.seconds;
-      }
-    });
-    var subjectEntries = Object.keys(subjectTotals).map(function(s) {
-      return { name: s, seconds: subjectTotals[s] };
-    }).sort(function(a, b) { return b.seconds - a.seconds; });
-    this.drawDonutChart(subjectEntries, total, 'day-donut-chart', 'day-donut-legend');
-  }
+  // No longer used - log list shows entries inline
 };
 
 // === Stats ===

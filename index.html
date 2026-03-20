@@ -68,38 +68,18 @@
     <!-- 統計タブ -->
     <div id="tab-stats" class="tab-content">
       <nav class="sub-tabs">
-        <button class="sub-tab active" data-subtab="calendar">カレンダー</button>
+        <button class="sub-tab active" data-subtab="calendar">ログ</button>
         <button class="sub-tab" data-subtab="charts">グラフ</button>
       </nav>
 
-      <!-- カレンダーサブタブ -->
+      <!-- ログリストサブタブ -->
       <div id="subtab-calendar" class="sub-tab-content active">
-        <div class="calendar" id="calendar">
-          <div class="calendar-header">
-            <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
-            <span id="cal-month"></span>
-            <button class="btn-icon" id="cal-next" aria-label="次月">›</button>
-          </div>
-          <div class="calendar-weekdays">
-            <span>月</span><span>火</span><span>水</span><span>木</span><span>金</span><span>土</span><span>日</span>
-          </div>
-          <div class="calendar-days" id="cal-days"></div>
+        <div class="log-list-nav">
+          <button class="btn-icon" id="cal-prev" aria-label="前月">‹</button>
+          <span id="cal-month"></span>
+          <button class="btn-icon" id="cal-next" aria-label="次月">›</button>
         </div>
-
-        <div class="day-detail" id="day-detail">
-          <div class="day-detail-header">
-            <div>
-              <h2 id="day-detail-date"></h2>
-              <div class="day-total" id="day-detail-total"></div>
-            </div>
-            <button class="btn-icon btn-add-entry" id="btn-add-entry" aria-label="記録を追加">＋</button>
-          </div>
-          <div class="day-detail-donut hidden" id="day-detail-donut">
-            <canvas id="day-donut-chart" width="200" height="200"></canvas>
-            <div class="day-donut-legend" id="day-donut-legend"></div>
-          </div>
-          <div class="day-entries" id="day-detail-entries"></div>
-        </div>
+        <div class="log-list" id="log-list"></div>
       </div>
 
       <!-- グラフサブタブ -->

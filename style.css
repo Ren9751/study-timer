@@ -943,3 +943,43 @@ body {
 .hidden {
   display: none !important;
 }
+
+/* Log list */
+.log-list-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 12px 0;
+}
+
+.log-list-nav span {
+  font-size: 16px;
+  font-weight: bold;
+}
+
+.log-list-day-header {
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  margin-top: 8px;
+  background: #1a1a1a;
+  border-radius: 8px 8px 0 0;
+  border-bottom: 1px solid #333;
+}
+
+.log-list-date {
+  font-weight: bold;
+  font-size: 14px;
+}
+
+.log-list-total {
+  margin-left: auto;
+  font-size: 13px;
+  color: #4a9;
+}
+
+.btn-add-entry-list {
+  margin-left: 8px;
+  font-size: 16px;
+}
