@@ -99,7 +99,6 @@ function StudyTimer() {
   this.currentSubject = '';
   this.calendarYear = new Date().getFullYear();
   this.calendarMonth = new Date().getMonth();
-  this.selectedDate = DateUtils.today();
   this.statsPeriod = 'week';
   this.statsOffset = 0;
   this.currentTab = 'timer';
